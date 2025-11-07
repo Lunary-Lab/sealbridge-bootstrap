@@ -1,0 +1,17 @@
+# .editorconfig: Helps maintain consistent coding styles for multiple developers.
+# This file sets basic formatting rules like indentation style, line endings,
+# and character set for various file types, which are automatically enforced
+# by compliant text editors.
+
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

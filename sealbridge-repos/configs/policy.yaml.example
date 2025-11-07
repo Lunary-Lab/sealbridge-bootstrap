@@ -1,0 +1,75 @@
+# configs/policy.yaml.example: Full example configuration.
+# This file provides a comprehensive example of the 'policy.yaml' configuration,
+# showcasing all available options for profiles, repositories, paths, and policies.
+# Users should copy this to ${XDG_CONFIG_HOME}/sealbridge/policy.yaml and customize it.
+
+version: 1
+profile: home # can be 'home' or 'work'
+
+defaults:
+  interval_sec: 60
+  jitter: 0.2 # 20% jitter
+  protected_branches: ["main", "master", "develop"]
+  direction: bidirectional # home-to-work, work-to-home, bidirectional
+  push:
+    allow_force_with_lease: false
+  pr:
+    enable: true
+    reviewers: ["gh-username-1", "gh-username-2"]
+    labels: ["sealbridge", "automated-pr"]
+  scan:
+    enable: true
+    tool: gitleaks
+    config: "" # optional: path to gitleaks config
+  paths:
+    include: [] # empty means all files are included by default
+    exclude:
+      - "${HOME}/workspace/**" # Default policy: exclude workspace dirs
+      - "**/.git/**"
+      - "**/.venv/**"
+      - "**/node_modules/**"
+      - "**/.idea/**"
+      - "**/.vscode/**"
+      - "*.pyc"
+      - "__pycache__/"
+
+crypto:
+  mode: git-crypt # or 'sops-age'
+  # GPG fingerprints for team members who can unlock the work repo
+  gpg_fprs:
+    - "YOUR_HOME_GPG_FINGERPRINT_HERE"
+    - "YOUR_WORK_GPG_FINGERPRINT_HERE"
+
+repos:
+  # Example 1: A sealed (encrypted) repository with bidirectional sync
+  - name: "my-project"
+    path: "${HOME}/dev/my-project" # Local path where the repo is cloned
+    personal: "git@github.com:your-username/my-project.git"
+    relay: "git@github.com:work-org/my-project-relay.git"
+    mode: sealed # 'sealed' means it's encrypted at the relay remote
+    direction: bidirectional
+    protected_branches: ["main"]
+    paths:
+      include:
+        - "**/*.py"
+        - "**/*.go"
+        - "Makefile"
+        - "go.mod"
+        - "go.sum"
+      exclude:
+        - "**/tests/fixtures/**"
+        - "**/build/**"
+
+  # Example 2: A plaintext repository, only synced from home to work
+  - name: "dotfiles"
+    path: "${HOME}/.dotfiles"
+    personal: "git@github.com:your-username/dotfiles.git"
+    relay: "git@github.com:work-org/dotfiles-relay.git"
+    mode: plain # 'plain' means no encryption is used at the relay
+    direction: home-to-work
+
+  # Example 3: A repository that is explicitly not synced
+  - name: "personal-blog"
+    path: "${HOME}/dev/blog"
+    personal: "git@github.com:your-username/blog.git"
+    mode: nosync # 'nosync' means this tool will ignore it completely

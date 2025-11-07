@@ -1,0 +1,18 @@
+# system/linux/sealbridge-bridge.service: systemd user unit for the home bridge.
+# This file defines a systemd service for the 'sealbridge-bridge', which runs
+# only on the user's home machine. It ensures the bridge is started automatically
+# and managed by systemd, but only when the 'home' profile is active.
+
+[Unit]
+Description=Sealbridge Home Bridge Translator
+After=network.target
+ConditionEnvironment=SEALBRIDGE_PROFILE=home
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/sealbridge-bridge
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

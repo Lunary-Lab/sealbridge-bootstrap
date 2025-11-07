@@ -1,0 +1,7 @@
+# configs/gitattributes.gitcrypt: Example .gitattributes for git-crypt.
+# This template can be used to initialize a relay repository for encryption.
+# The '*' pattern encrypts all files, while the 'linguist-generated=true'
+# attribute helps GitHub classify the repository's language correctly.
+
+* filter=git-crypt diff=git-crypt
+.gitattributes !filter !diff

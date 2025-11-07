@@ -1,0 +1,21 @@
+# .gitignore: Specifies intentionally untracked files to ignore.
+# Prevents local development artifacts, virtual environments, and sensitive files
+# from being committed to the repository.
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+.env
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# IDEs
+.idea/
+.vscode/

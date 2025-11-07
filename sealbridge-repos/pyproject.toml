@@ -1,0 +1,56 @@
+# pyproject.toml: Defines project metadata, dependencies, and tool configurations.
+# Managed by uv for dependency resolution and hatchling for building.
+# It includes sections for project info, dependencies (main and dev),
+# and configurations for tools like ruff and mypy.
+# The 'pip.hash-checking' mode is set to 'require' to ensure dependency integrity.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sealbridge-repos"
+version = "0.1.0"
+description = "Bi-directional code sync with encrypted-at-work remotes."
+authors = [{ name = "Jules", email = "jules@example.com" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "typer[all]",
+    "rich",
+    "platformdirs",
+    "pyyaml",
+    "pydantic",
+    "requests",
+    "filelock",
+    "pathspec",
+]
+
+[project.scripts]
+reposctl = "sealrepos.cli:app"
+sealreposd = "sealrepos.daemon:main"
+sealbridge-bridge = "sealrepos.bridge:main"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-xdist",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sealrepos"]

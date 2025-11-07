@@ -1,0 +1,15 @@
+# system/linux/sealreposd.timer: systemd user timer for the daemon.
+# This file defines a systemd timer that periodically starts the 'sealreposd'
+# service. This is an alternative to running the daemon continuously, allowing
+# for scheduled syncs instead of a long-running process.
+
+[Unit]
+Description=Run sealreposd periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Unit=sealreposd.service
+
+[Install]
+WantedBy=timers.target

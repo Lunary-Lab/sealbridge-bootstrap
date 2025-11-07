@@ -1,0 +1,17 @@
+# system/linux/sealreposd.service: systemd user unit for the daemon.
+# This file defines a systemd service that runs the 'sealreposd' daemon as the
+# user. It should be placed in `${XDG_CONFIG_HOME}/systemd/user/`. It ensures
+# the daemon is started automatically and managed by systemd.
+
+[Unit]
+Description=Sealbridge Repos Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/sealreposd
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

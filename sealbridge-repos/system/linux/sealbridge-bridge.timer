@@ -1,0 +1,15 @@
+# system/linux/sealbridge-bridge.timer: systemd user timer for the home bridge.
+# This file defines a systemd timer that periodically starts the
+# 'sealbridge-bridge' service. It provides a scheduled alternative to a
+# continuously running bridge process, suitable for home machines.
+
+[Unit]
+Description=Run sealbridge-bridge periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Unit=sealbridge-bridge.service
+
+[Install]
+WantedBy=timers.target
