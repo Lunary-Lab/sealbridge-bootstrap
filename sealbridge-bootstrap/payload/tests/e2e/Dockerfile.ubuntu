@@ -1,0 +1,37 @@
+# Dockerfile.ubuntu
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3.11 \
+    python3.11-venv \
+    curl \
+    git \
+    ssh \
+    zstd \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash tester
+USER tester
+WORKDIR /home/tester
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/tester/.cargo/bin:${PATH}"
+
+# Copy the payload
+COPY ./payload /app/payload
+
+# Set up the environment
+WORKDIR /app/payload
+RUN uv venv && \
+    . .venv/bin/activate && \
+    uv pip sync requirements.lock && \
+    uv pip install -e .
+
+# Run the bootstrap
+CMD ["/bin/bash"]
