@@ -3,6 +3,7 @@ import os
 import pytest
 import docker
 from pathlib import Path
+import tempfile
 
 # Mark this test as an e2e test
 pytestmark = pytest.mark.e2e
@@ -21,18 +22,17 @@ def docker_client():
 def bootstrap_image(docker_client):
     """Builds the Docker image for the E2E test."""
     image_tag = "sealbridge-bootstrap-e2e:latest"
-    dockerfile_path = Path(__file__).parent
+    dockerfile_path = str(Path(__file__).parent.parent.parent.absolute())
 
     try:
         image, logs = docker_client.images.build(
-            path=str(dockerfile_path),
-            dockerfile="Dockerfile.ubuntu",
+            path=dockerfile_path,
+            dockerfile="payload/tests/e2e/Dockerfile.ubuntu",
             tag=image_tag,
             rm=True
         )
         yield image_tag
     finally:
-        # Clean up the image
         try:
             docker_client.images.remove(image_tag, force=True)
         except docker.errors.ImageNotFound:
@@ -40,33 +40,54 @@ def bootstrap_image(docker_client):
 
 def test_bootstrap_flow(docker_client, bootstrap_image):
     """
-    Runs the bootstrap process inside a Docker container and verifies the result.
-    This is a simplified E2E test that checks if the CLI runs without crashing.
-    A full E2E test would require a mock OTP server and a git server.
+    Runs the full bootstrap process inside a Docker container and verifies the result.
     """
     container = None
     try:
+        # Create a temporary file for the bootstrap.yaml config
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("""
+version: 1
+profile: "work"
+otp_gate:
+  url: "http://127.0.0.1:8765/v1/verify"
+  client_id: "bootstrap"
+  client_secret_env: "SB_BOOTSTRAP_CLIENT_SECRET"
+age:
+  binary:
+    version: "v1.2.0"
+    checksums_url: "https://github.com/FiloSottile/age/releases/download/v1.2.0/sha256sums.txt"
+  encrypted_key_path: "/home/tester/.ssh/id_ed25519"
+git:
+  dotfiles_repo: "/tmp/dotfiles.git"
+  branch: "main"
+chezmoi:
+  version: "v2.48.1"
+  assets:
+    linux_amd64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_linux_amd64.tar.gz"
+      sha256: "ab61698359b203701cabc08e062efdca595954b7e24c59547c979c377eb5a4da"
+            """)
+            config_path = f.name
+
         container = docker_client.containers.run(
             bootstrap_image,
-            command=["/usr/bin/python3.11", "-m", "sbboot.cli", "doctor"],
+            command=["/bin/bash", "-c", "python3 /app/mock_otp_server.py & . .venv/bin/activate && sbboot run --config /tmp/config.yaml"],
             detach=True,
+            ports={'8765/tcp': 8765},
+            volumes={config_path: {'bind': '/tmp/config.yaml', 'mode': 'ro'}},
             environment={
                 "SB_BOOTSTRAP_CLIENT_SECRET": "test-secret"
             }
         )
-        result = container.wait(timeout=120)
+        result = container.wait(timeout=300)
         logs = container.logs().decode("utf-8")
 
-        # Verify that the doctor command ran successfully
-        assert "Running SealBridge Doctor" in logs
-        assert "XDG Paths are resolved" in logs
-        assert "Found 'git' in PATH" in logs
-        assert "SSH Agent is running or can be started" in logs
-
-        # A real test would check for a successful bootstrap run,
-        # but for now, we'll just check that the doctor command works.
+        assert "Bootstrap complete!" in logs
+        assert "sealbridge-e2e-test" in container.exec_run("cat /home/tester/.test-file").output.decode("utf-8")
         assert result["StatusCode"] == 0
 
     finally:
         if container:
             container.remove(force=True)
+        os.unlink(config_path)

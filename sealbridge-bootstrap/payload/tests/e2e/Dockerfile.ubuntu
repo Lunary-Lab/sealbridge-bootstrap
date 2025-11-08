@@ -11,7 +11,7 @@ RUN apt-get update && \
     git \
     ssh \
     zstd \
-    openssh-client \
+    openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -23,15 +23,28 @@ WORKDIR /home/tester
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/tester/.cargo/bin:${PATH}"
 
-# Copy the payload
-COPY ./payload /app/payload
+# Copy the application payload and test assets
+COPY --chown=tester:tester ./payload /app/payload
+COPY --chown=tester:tester ./payload/tests/e2e/mock_otp_server.py /app/mock_otp_server.py
+COPY --chown=tester:tester ./payload/tests/e2e/setup_git_repo.sh /app/setup_git_repo.sh
 
-# Set up the environment
+# Set up the Python environment and test git repo
+WORKDIR /app
+RUN chmod +x setup_git_repo.sh && ./setup_git_repo.sh
+
+# Generate and set up SSH keys for the test
+RUN ssh-keygen -t ed25519 -f /home/tester/.ssh/id_ed25519 -N "" && \
+    cat /home/tester/.ssh/id_ed25519.pub >> /home/tester/.ssh/authorized_keys && \
+    chmod 600 /home/tester/.ssh/authorized_keys
+
+# Set up the Python environment
 WORKDIR /app/payload
 RUN uv venv && \
     . .venv/bin/activate && \
     uv pip sync requirements.lock && \
     uv pip install -e .
 
-# Run the bootstrap
+# Expose the OTP port
+EXPOSE 8765
+
 CMD ["/bin/bash"]

@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 from rich.console import Console
 
-from . import paths, util
+from . import paths, util, policy
 from .config import AgeConfig
 from .errors import AgeBinaryError
 
@@ -71,7 +71,7 @@ def _extract_binary(archive_path: Path, binary_path_in_archive: str, dest_path: 
     console.log(f"Binary extracted to '{dest_path}'")
 
 
-def get_age_binary(config: AgeConfig) -> Path:
+def get_age_binary(config: "BootstrapConfig") -> Path:
     """
     Ensures the 'age' binary is available, downloading and verifying it if necessary.
 
@@ -88,22 +88,23 @@ def get_age_binary(config: AgeConfig) -> Path:
         console.log(f"Found existing 'age' binary at '{expected_binary_path}'")
         return expected_binary_path
 
-    console.print(f"Age binary not found. Downloading version [bold cyan]{config.binary.version}[/bold cyan]...")
+    console.print(f"Age binary not found. Downloading version [bold cyan]{config.age.binary.version}[/bold cyan]...")
     arch = _get_system_arch()
-    version = config.binary.version
+    version = config.age.binary.version
     asset_name, binary_in_archive_path = _get_asset_name_and_binary_path(version, arch)
 
     try:
-        console.log(f"Fetching checksums from {config.binary.checksums_url}")
-        checksum_content = httpx.get(str(config.binary.checksums_url)).text
+        console.log(f"Fetching checksums from {config.age.binary.checksums_url}")
+        checksum_content = httpx.get(str(config.age.binary.checksums_url)).text
         checksums = util.parse_checksum_file(checksum_content)
         expected_checksum = checksums.get(asset_name)
         if not expected_checksum:
             raise AgeBinaryError(f"Could not find checksum for asset '{asset_name}'")
 
-        download_url = str(config.binary.checksums_url).replace("sha256sums.txt", asset_name)
+        policy_manager = policy.get_policy_manager(config)
+        download_url = str(config.age.binary.checksums_url).replace("sha256sums.txt", asset_name)
         download_path = bin_dir / asset_name
-        util.download_file(download_url, download_path)
+        util.download_file(download_url, download_path, policy_manager)
 
         console.log(f"Verifying checksum for '{asset_name}'...")
         util.verify_sha256(download_path, expected_checksum)

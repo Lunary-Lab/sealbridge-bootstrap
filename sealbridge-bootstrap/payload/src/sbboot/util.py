@@ -41,17 +41,19 @@ def verify_sha256(file_path: Path, expected_checksum: str) -> None:
         )
 
 
-def download_file(url: str, dest_path: Path) -> None:
+def download_file(url: str, dest_path: Path, policy_manager) -> None:
     """
     Downloads a file from a URL to a destination path with a progress bar.
 
     Args:
         url: The URL to download from.
         dest_path: The path to save the downloaded file to.
+        policy_manager: The policy manager to check the write against.
 
     Raises:
         SealBridgeError: If the download fails.
     """
+    policy_manager.check_write(dest_path)
     try:
         with tempfile.NamedTemporaryFile(delete=False, dir=dest_path.parent) as tmp_file:
             tmp_path = Path(tmp_file.name)

@@ -76,12 +76,13 @@ def run(
         apply_dotfiles(ctx, profile=target_profile)
 
         # Clone extra repos
-        from . import gitwrap
+        from . import gitwrap, policy
         if cfg.git.extra_repos:
+            policy_manager = policy.get_policy_manager(cfg)
             console.print("\n[bold]Cloning extra repositories...[/bold]")
             for repo in cfg.git.extra_repos:
                 dest_dir = paths.HOME / "workspace" / repo.name
-                gitwrap.clone(repo.url, dest_dir, cfg.git.branch)
+                gitwrap.clone(repo.url, dest_dir, cfg.git.branch, policy_manager)
 
         console.print("\n🎉 [bold green]Bootstrap complete! Your workstation is ready.[/bold green]")
 
@@ -112,7 +113,7 @@ def add_key(ctx: typer.Context):
     cfg: config.BootstrapConfig = ctx.obj
 
     try:
-        age_bin = agewrap.get_age_binary(cfg.age)
+        age_bin = agewrap.get_age_binary(cfg)
         key_path = cfg.resolve_path(cfg.age.encrypted_key_path)
 
         if not key_path.exists():

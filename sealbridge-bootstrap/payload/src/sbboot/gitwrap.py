@@ -6,16 +6,18 @@ from pathlib import Path
 
 from rich.console import Console
 
+from . import policy
 from .config import GitConfig
 from .errors import GitError
 
 console = Console(stderr=True)
 
 
-def clone(repo_url: str, dest_dir: Path, branch: str = "main") -> None:
+def clone(repo_url: str, dest_dir: Path, branch: str = "main", policy_manager) -> None:
     """
     Clones a Git repository.
     """
+    policy_manager.check_write(dest_dir)
     if dest_dir.exists():
         console.log(f"Directory '{dest_dir}' already exists. Skipping clone.")
         return

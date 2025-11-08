@@ -12,7 +12,7 @@ from typing import Optional
 
 from rich.console import Console
 
-from . import paths, util
+from . import paths, util, policy
 from .config import BootstrapConfig
 from .errors import ChezmoiError
 
@@ -37,7 +37,7 @@ def _get_system_arch() -> str:
     return f"{system}_{arch_map[machine]}"
 
 
-def get_chezmoi_binary(config: BootstrapConfig) -> Path:
+def get_chezmoi_binary(config: "BootstrapConfig") -> Path:
     """
     Ensures the 'chezmoi' binary is available, downloading and verifying it if necessary.
     """
@@ -52,13 +52,14 @@ def get_chezmoi_binary(config: BootstrapConfig) -> Path:
 
     try:
         arch = _get_system_arch()
+        policy_manager = policy.get_policy_manager(config)
         asset = config.get_chezmoi_asset_for_system(arch)
         if not asset:
             raise ChezmoiError(f"No chezmoi asset found for system '{arch}' in configuration.")
 
         asset_filename = Path(asset.url.path).name
         download_path = bin_dir / asset_filename
-        util.download_file(str(asset.url), download_path)
+        util.download_file(str(asset.url), download_path, policy_manager)
 
         console.log(f"Verifying checksum for '{asset_filename}'...")
         util.verify_sha256(download_path, asset.sha256)

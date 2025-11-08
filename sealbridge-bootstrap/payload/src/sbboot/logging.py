@@ -69,9 +69,6 @@ def setup_logging(config: BootstrapConfig):
                 },
             }
         })
-        # Add python-json-logger to dependencies
-        import subprocess
-        subprocess.run([sys.executable, "-m", "pip", "install", "python-json-logger"], check=True)
     else:
         logging.basicConfig(
             level=log_level,
