@@ -36,6 +36,8 @@ pydantic-core==2.41.5
     # via pydantic
 pygments==2.19.2
     # via rich
+python-json-logger==2.0.7
+    # via sbboot (pyproject.toml)
 pyyaml==6.0.3
     # via sbboot (pyproject.toml)
 rich==13.9.4
