@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sbboot"
+version = "0.1.0"
+description = "SealBridge Bootstrap: Two-gate workstation bootstrap utility."
+authors = [{ name = "SealBridge", email = "dev@sealbridge.dev" }]
+license = "MIT"
+readme = "../README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "typer[all]>=0.9.0,<1.0.0",
+    "platformdirs>=4.0.0,<5.0.0",
+    "orjson>=3.9.0,<4.0.0",
+    "pydantic>=2.4.0,<3.0.0",
+    "rich>=13.7.0,<14.0.0",
+    "filelock>=3.12.0,<4.0.0",
+    "httpx>=0.25.0,<1.0.0",
+    "PyYAML>=6.0,<7.0",
+    "python-json-logger>=2.0.0,<3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/sealbridge/sealbridge-bootstrap"
+Issues = "https://github.com/sealbridge/sealbridge-bootstrap/issues"
+
+[project.scripts]
+sbboot = "sbboot.cli:app"
+
+[tool.hatch.version]
+path = "src/sbboot/__init__.py"
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "N", "D", "B", "A", "C4", "UP", "S"]
+ignore = ["D100", "D104", "D107"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+strict = true
+exclude = ["tests/"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0,<9.0.0",
+    "pytest-mock>=3.0.0,<4.0.0",
+    "docker>=6.0.0,<7.0.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]

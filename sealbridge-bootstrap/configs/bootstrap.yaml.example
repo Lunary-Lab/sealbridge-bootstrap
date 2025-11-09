@@ -1,0 +1,85 @@
+# SealBridge Bootstrap Configuration (Example)
+# Docs: https://github.com/sealbridge/sealbridge-bootstrap/blob/main/README.md
+
+# Version of the configuration file format.
+version: 1
+
+# Default profile for dotfiles, can be overridden by the DOTFILES_PROFILE env var.
+# Common values: "work", "home"
+profile: "work"
+
+# Policy engine configuration for filesystem access.
+policy:
+  # List of allowed path globs. If empty, access is restricted to bootstrap-managed directories.
+  include: []
+
+  # List of forbidden path globs. This has higher precedence than 'include'.
+  # It's strongly recommended to keep the default workspace exclusion.
+  exclude:
+    - "${HOME}/workspace/**"
+
+# Configuration for the SealBridge OTP Gate client.
+otp_gate:
+  # URL of the verification endpoint.
+  url: "http://127.0.0.1:8765/v1/verify"
+  # Client ID for this bootstrap application.
+  client_id: "bootstrap"
+  # Name of the environment variable containing the client secret.
+  # The secret must be set on the machine before running the bootstrap.
+  # Example: export SB_BOOTSTRAP_CLIENT_SECRET="your-secret-here"
+  client_secret_env: "SB_BOOTSTRAP_CLIENT_SECRET"
+
+# Configuration for the 'age' encryption tool and the bootstrap SSH key.
+age:
+  binary:
+    # Pinned version of the age binary to download.
+    version: "v1.2.0"
+    # URL to the official checksums file for verification.
+    checksums_url: "https://github.com/FiloSottile/age/releases/download/v1.2.0/sha256sums.txt"
+
+  # Path to the encrypted SSH key within this repository.
+  encrypted_key_path: "assets/id_bootstrap.age"
+
+# Git repository configuration.
+git:
+  # SSH URL of your private dotfiles repository.
+  dotfiles_repo: "git@github.com:your-username/dotfiles.git"
+
+  # Optional list of additional private repositories to clone during bootstrap.
+  extra_repos: []
+    # - name: "sealbridge-prompts"
+    #   url: "git@github.com:your-username/sealbridge-prompts.git"
+
+  # Default branch to use.
+  branch: "main"
+
+# Configuration for the 'chezmoi' dotfiles manager.
+chezmoi:
+  # Pinned version of chezmoi to download.
+  version: "v2.48.1"
+  # Asset definitions for different OS/architecture combinations.
+  # The bootstrap script will automatically select the correct one.
+  # SHA256 checksums are mandatory and verified before extraction/execution.
+  assets:
+    linux_amd64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_linux_amd64.tar.gz"
+      sha256: "..."
+    linux_arm64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_linux_arm64.tar.gz"
+      sha256: "..."
+    windows_amd64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_windows_amd64.zip"
+      sha256: "..."
+    darwin_amd64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_darwin_amd64.tar.gz"
+      sha256: "..."
+    darwin_arm64:
+      url: "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_darwin_arm64.tar.gz"
+      sha256: "..."
+
+# Logging configuration.
+logging:
+  # Logging level: "DEBUG", "INFO", "WARNING", "ERROR"
+  level: "INFO"
+  # Set to true for structured JSON logs, false for human-readable console output.
+  json: true
