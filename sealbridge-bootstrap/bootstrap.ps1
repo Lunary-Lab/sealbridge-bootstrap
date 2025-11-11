@@ -1,6 +1,6 @@
 # SealBridge Bootstrap - PowerShell Entrypoint
 #
-# Invoke-Expression (Invoke-WebRequest -Uri "https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/bootstrap.ps1" -UseBasicParsing | Select-Object -ExpandProperty Content)
+# $script = (Invoke-WebRequest -Uri "https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/bootstrap.ps1" -UseBasicParsing).Content; Invoke-Expression $script
 #
 
 $ErrorActionPreference = "Stop"
