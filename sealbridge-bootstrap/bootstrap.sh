@@ -46,7 +46,7 @@ main() {
     mkdir -p "$APP_CACHE_DIR"
 
     TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'sb-bootstrap')
-    PAYLOAD_PATH="$TMP_DIR/payload.tar.zst"
+    PAYLOAD_PATH="$TMP_DIR/payload.tar.gz"
 
     _info "Downloading payload from $PAYLOAD_URL..."
     curl -fsSL --retry 3 -o "$PAYLOAD_PATH" "$PAYLOAD_URL"
