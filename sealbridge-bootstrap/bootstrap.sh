@@ -8,8 +8,8 @@ set -euf
 
 # --- Configuration ---
 APP_VERSION="0.1.0"
-PAYLOAD_URL="https://your-dist-server.com/sealbridge/bootstrap/v${APP_VERSION}/payload.tar.zst"
-PAYLOAD_SHA256="<SHA256_CHECKSUM_EMBEDDED_HERE>"
+PAYLOAD_URL="https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/payload.tar.zst"
+PAYLOAD_SHA256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 # ---
 
 _info() {
