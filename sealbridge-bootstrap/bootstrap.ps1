@@ -1,85 +1,99 @@
+# SealBridge Bootstrap - PowerShell Entrypoint
 #
-# SealBridge Bootstrap - PowerShell Entrypoint Stub
+# Invoke-Expression (Invoke-WebRequest -Uri "https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/bootstrap.ps1" -UseBasicParsing).Content
 #
-# iex (irm https://.../bootstrap.ps1)
-#
+
+$ErrorActionPreference = "Stop"
 
 # --- Configuration ---
 $APP_VERSION = "0.1.0"
-$PAYLOAD_URL = "https://your-dist-server.com/sealbridge/bootstrap/v$APP_VERSION/payload.zip"
-$PAYLOAD_SHA256 = "<SHA256_CHECKSUM_EMBEDDED_HERE>"
+$PAYLOAD_URL = "https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/payload.tar.gz"
+$PAYLOAD_SHA256 = "7986abd5c47865559070c0b74663f1faa6db137cf5db035cc36cee8f4db387bb"
 # ---
 
 function Write-Info {
     param([string]$Message)
-    Write-Host "sealbridge-bootstrap: $Message"
+    Write-Host "sealbridge-bootstrap: $Message" -ForegroundColor Cyan
 }
 
 function Write-Error {
     param([string]$Message)
-    Write-Error "ERROR: $Message"
+    Write-Host "sealbridge-bootstrap: ERROR: $Message" -ForegroundColor Red
     exit 1
 }
 
+function Test-Command {
+    param([string]$Command)
+    $null = Get-Command $Command -ErrorAction SilentlyContinue
+    if (-not $?) {
+        Write-Error "'$Command' is required but not found in PATH."
+    }
+}
+
+function Get-Sha256Hash {
+    param([string]$FilePath)
+    $hash = Get-FileHash -Path $FilePath -Algorithm SHA256
+    return $hash.Hash.ToLower()
+}
+
 function Main {
-    $XDG_CACHE_HOME = $env:XDG_CACHE_HOME
-    if ([string]::IsNullOrEmpty($XDG_CACHE_HOME)) {
-        $XDG_CACHE_HOME = Join-Path $env:USERPROFILE ".cache"
-    }
-    $APP_CACHE_DIR = Join-Path $XDG_CACHE_HOME "sealbridge/bootstrap/$APP_VERSION"
-    if (-not (Test-Path $APP_CACHE_DIR)) {
-        New-Item -ItemType Directory -Path $APP_CACHE_DIR | Out-Null
-    }
-
-    $TMP_DIR = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString()))
-    $PAYLOAD_PATH = Join-Path $TMP_DIR "payload.zip"
-
+    # Check dependencies
+    Test-Command "curl"
+    
+    # Determine cache directory
+    $XDG_CACHE_HOME = if ($env:XDG_CACHE_HOME) { $env:XDG_CACHE_HOME } else { "$env:USERPROFILE\.cache" }
+    $APP_CACHE_DIR = "$XDG_CACHE_HOME\sealbridge\bootstrap\$APP_VERSION"
+    New-Item -ItemType Directory -Force -Path $APP_CACHE_DIR | Out-Null
+    
+    # Create temp directory
+    $TMP_DIR = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
+    $PAYLOAD_PATH = "$TMP_DIR\payload.tar.gz"
+    
     Write-Info "Downloading payload from $PAYLOAD_URL..."
     try {
-        Invoke-RestMethod -Uri $PAYLOAD_URL -OutFile $PAYLOAD_PATH -UseBasicParsing
+        Invoke-WebRequest -Uri $PAYLOAD_URL -OutFile $PAYLOAD_PATH -UseBasicParsing
     } catch {
         Write-Error "Failed to download payload: $_"
     }
-
+    
     Write-Info "Verifying payload checksum..."
-    $CHECKSUM = (Get-FileHash -Algorithm SHA256 -Path $PAYLOAD_PATH).Hash.ToLower()
-    if ($CHECKSUM -ne $PAYLOAD_SHA256.ToLower()) {
-        Write-Error "Checksum mismatch! Aborting."
+    $CHECKSUM = Get-Sha256Hash -FilePath $PAYLOAD_PATH
+    if ($CHECKSUM -ne $PAYLOAD_SHA256) {
+        Write-Error "Checksum mismatch! Expected: $PAYLOAD_SHA256, Got: $CHECKSUM"
     }
-
+    
     Write-Info "Extracting payload to $APP_CACHE_DIR..."
-    try {
-        Expand-Archive -Path $PAYLOAD_PATH -DestinationPath $APP_CACHE_DIR -Force
-    } catch {
-        Write-Error "Failed to extract payload: $_"
+    # Use tar if available (Windows 10 1903+), otherwise use 7zip or other tools
+    if (Get-Command tar -ErrorAction SilentlyContinue) {
+        tar -xzf $PAYLOAD_PATH -C $APP_CACHE_DIR
+    } else {
+        Write-Error "tar is required but not found. Please install tar (available on Windows 10 1903+ or via Git for Windows)."
     }
-
-    Push-Location $APP_CACHE_DIR
-
+    
+    Set-Location $APP_CACHE_DIR
+    
+    # Check for uv
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
         Write-Info "Installing 'uv'..."
-        try {
-            Invoke-RestMethod -Uri "https://astral.sh/uv/install.ps1" | Invoke-Expression
-        } catch {
-            Write-Error "Failed to install 'uv': $_"
-        }
+        $uvInstallScript = "$TMP_DIR\install-uv.ps1"
+        Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile $uvInstallScript -UseBasicParsing
+        & $uvInstallScript
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
     }
-
+    
     Write-Info "Creating Python virtual environment..."
-    uv.exe venv
-
+    & uv venv
+    
     Write-Info "Installing dependencies..."
-    uv.exe pip sync requirements.lock
-
+    & uv pip sync requirements.lock
+    
     Write-Info "Starting SealBridge Bootstrap application..."
-    $python_executable = Join-Path $APP_CACHE_DIR ".venv/Scripts/python.exe"
-    & $python_executable -m sbboot.cli run $args
-
-    Pop-Location
+    & .venv\Scripts\python.exe -m sbboot.cli run @args
+    
     Write-Info "Cleaning up..."
     Remove-Item -Recurse -Force $TMP_DIR
-
+    
     Write-Info "Done."
 }
 
-Main $args
+Main @args
