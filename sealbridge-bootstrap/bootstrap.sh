@@ -9,7 +9,7 @@ set -euf
 # --- Configuration ---
 APP_VERSION="0.1.0"
 PAYLOAD_URL="https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.0/payload.tar.zst"
-PAYLOAD_SHA256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+PAYLOAD_SHA256="7986abd5c47865559070c0b74663f1faa6db137cf5db035cc36cee8f4db387bb"
 # ---
 
 _info() {
@@ -38,7 +38,6 @@ _get_sha256_cmd() {
 main() {
     _check_dep "curl"
     _check_dep "tar"
-    _check_dep "zstd"
 
     SHA256_CMD=$(_get_sha256_cmd)
 
@@ -59,7 +58,7 @@ main() {
     fi
 
     _info "Extracting payload to $APP_CACHE_DIR..."
-    tar -I zstd -xf "$PAYLOAD_PATH" -C "$APP_CACHE_DIR"
+    tar -xzf "$PAYLOAD_PATH" -C "$APP_CACHE_DIR"
 
     cd "$APP_CACHE_DIR"
 
