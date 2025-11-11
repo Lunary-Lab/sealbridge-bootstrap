@@ -91,10 +91,8 @@ function Main {
     Write-Info "Installing dependencies..."
     & uv pip sync requirements.lock
     
-    Write-Info "Installing bootstrap package in editable mode..."
-    & uv pip install -e .
-    
     Write-Info "Starting SealBridge Bootstrap application..."
+    $env:PYTHONPATH = "$APP_CACHE_DIR\src;$env:PYTHONPATH"
     & .venv\Scripts\python.exe -m sbboot.cli run @args
     
     Write-Info "Cleaning up..."
