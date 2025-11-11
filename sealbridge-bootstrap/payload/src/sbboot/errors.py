@@ -81,3 +81,9 @@ class EnvironmentError(SealBridgeError):
     """Exception for invalid environment (e.g., bad HOME path)."""
     def __init__(self, message: str):
         super().__init__(message, ExitCode.ENVIRONMENT_ERROR)
+
+
+class SealreposError(SealBridgeError):
+    """Exception for sealbridge-repos installation/configuration errors."""
+    def __init__(self, message: str):
+        super().__init__(message, ExitCode.UNKNOWN_ERROR)

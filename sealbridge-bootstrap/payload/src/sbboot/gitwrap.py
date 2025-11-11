@@ -13,7 +13,7 @@ from .errors import GitError
 console = Console(stderr=True)
 
 
-def clone(repo_url: str, dest_dir: Path, branch: str = "main", policy_manager) -> None:
+def clone(repo_url: str, dest_dir: Path, policy_manager, branch: str = "main") -> None:
     """
     Clones a Git repository.
     """

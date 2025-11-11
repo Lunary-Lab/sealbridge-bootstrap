@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from . import __version__, config, errors, paths
-from .errors import ExitCode, SealBridgeError
+from .errors import ExitCode, SealBridgeError, SealreposError
 
 app = typer.Typer(
     name="sbboot",
@@ -75,14 +75,24 @@ def run(
         # Apply Dotfiles
         apply_dotfiles(ctx, profile=target_profile)
 
+        # Install and configure SealBridge Repos
+        from . import policy, sealrepos
+        policy_manager = policy.get_policy_manager(cfg)
+        
+        try:
+            sealrepos.install_sealrepos(cfg, policy_manager)
+            sealrepos.configure_sealrepos(cfg, policy_manager)
+        except (SealBridgeError, SealreposError) as e:
+            console.print(f"[yellow]Warning:[/yellow] Failed to install/configure SealBridge Repos: {e}")
+            console.print("You can install it manually later if needed.")
+
         # Clone extra repos
-        from . import gitwrap, policy
+        from . import gitwrap
         if cfg.git.extra_repos:
-            policy_manager = policy.get_policy_manager(cfg)
             console.print("\n[bold]Cloning extra repositories...[/bold]")
             for repo in cfg.git.extra_repos:
                 dest_dir = paths.HOME / "workspace" / repo.name
-                gitwrap.clone(repo.url, dest_dir, cfg.git.branch, policy_manager)
+                gitwrap.clone(repo.url, dest_dir, policy_manager, cfg.git.branch)
 
         console.print("\n🎉 [bold green]Bootstrap complete! Your workstation is ready.[/bold green]")
 

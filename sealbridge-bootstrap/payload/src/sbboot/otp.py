@@ -65,9 +65,9 @@ def verify_totp_code(
     """
     client_secret = _get_client_secret(config)
     payload = {
-        "client_id": config.client_id,
-        "client_secret": client_secret,
-        "token": totp_code,
+        "user": "bootstrap",  # OTP gate expects 'user' field
+        "code": totp_code,   # OTP gate expects 'code' field
+        "ts": int(time.time()),  # OTP gate expects 'ts' (timestamp) field
     }
 
     last_exception: Exception | None = None
@@ -76,7 +76,9 @@ def verify_totp_code(
         for attempt in range(max_retries):
             try:
                 console.log(f"Attempting OTP verification (attempt {attempt + 1}/{max_retries})...")
-                response = client.post(str(config.url), json=payload)
+                # OTP gate uses Basic auth with client_id:client_secret
+                auth = (config.client_id, client_secret)
+                response = client.post(str(config.url), json=payload, auth=auth)
                 response.raise_for_status()
 
                 data = response.json()
