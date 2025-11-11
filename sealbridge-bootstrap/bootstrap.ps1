@@ -91,6 +91,9 @@ function Main {
     Write-Info "Installing dependencies..."
     & uv pip sync requirements.lock
     
+    Write-Info "Installing bootstrap package in editable mode..."
+    & uv pip install -e .
+    
     Write-Info "Starting SealBridge Bootstrap application..."
     & .venv\Scripts\python.exe -m sbboot.cli run @args
     
