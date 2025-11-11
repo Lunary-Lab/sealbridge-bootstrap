@@ -63,23 +63,15 @@ function Main {
     }
     
     Write-Info "Extracting payload to $APP_CACHE_DIR..."
-    # Use tar if available (Windows 10 1903+), otherwise use 7zip or other tools
-    if (Get-Command tar -ErrorAction SilentlyContinue) {
-        # Use Windows tar (not WSL tar) - ensure we're using the Windows version
-        $tarPath = (Get-Command tar -ErrorAction SilentlyContinue).Source
-        if ($tarPath -like "*\Windows\*" -or $tarPath -like "*\Program Files\*") {
-            & tar -xzf $PAYLOAD_PATH -C $APP_CACHE_DIR
-        } else {
-            # If it's WSL tar, try to find Windows tar or use alternative
-            $windowsTar = "$env:SystemRoot\System32\tar.exe"
-            if (Test-Path $windowsTar) {
-                & $windowsTar -xzf $PAYLOAD_PATH -C $APP_CACHE_DIR
-            } else {
-                Write-Error "tar is required but not found. Please install tar (available on Windows 10 1903+ or via Git for Windows)."
-            }
+    # Use Windows tar (Windows 10 1903+), explicitly use System32 version to avoid WSL tar
+    $windowsTar = "$env:SystemRoot\System32\tar.exe"
+    if (Test-Path $windowsTar) {
+        & $windowsTar -xzf $PAYLOAD_PATH -C $APP_CACHE_DIR
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to extract payload. tar exited with code $LASTEXITCODE"
         }
     } else {
-        Write-Error "tar is required but not found. Please install tar (available on Windows 10 1903+ or via Git for Windows)."
+        Write-Error "tar is required but not found at $windowsTar. Please ensure you're running Windows 10 1903+ or install Git for Windows."
     }
     
     Set-Location $APP_CACHE_DIR
