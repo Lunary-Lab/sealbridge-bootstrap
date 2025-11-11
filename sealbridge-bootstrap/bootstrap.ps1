@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 # --- Configuration ---
 $APP_VERSION = "0.1.1"
 $PAYLOAD_URL = "https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/v0.1.1/payload.tar.gz"
-$PAYLOAD_SHA256 = "7986abd5c47865559070c0b74663f1faa6db137cf5db035cc36cee8f4db387bb"
+$PAYLOAD_SHA256 = "48fda6afd73777f8af4af4bd81e4cdf4267e94c122c83b1ce83de81d7eee7b67"
 # ---
 
 function Write-Info {
