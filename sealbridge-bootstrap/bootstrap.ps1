@@ -76,6 +76,29 @@ function Main {
     
     Set-Location $APP_CACHE_DIR
     
+    # Ensure XDG directories exist
+    $XDG_DATA_HOME = if ($env:XDG_DATA_HOME) { $env:XDG_DATA_HOME } else { "$env:USERPROFILE\.local\share" }
+    $XDG_CONFIG_HOME = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { "$env:USERPROFILE\.config" }
+    $XDG_CACHE_HOME = if ($env:XDG_CACHE_HOME) { $env:XDG_CACHE_HOME } else { "$env:USERPROFILE\.cache" }
+    $XDG_STATE_HOME = if ($env:XDG_STATE_HOME) { $env:XDG_STATE_HOME } else { "$env:USERPROFILE\.local\state" }
+    
+    New-Item -ItemType Directory -Force -Path $XDG_DATA_HOME | Out-Null
+    New-Item -ItemType Directory -Force -Path $XDG_CONFIG_HOME | Out-Null
+    New-Item -ItemType Directory -Force -Path $XDG_CACHE_HOME | Out-Null
+    New-Item -ItemType Directory -Force -Path $XDG_STATE_HOME | Out-Null
+    
+    # Add bin directory to PATH if not present
+    $BIN_DIR = "$XDG_DATA_HOME\sealbridge\bin"
+    New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
+    
+    $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -notlike "*$BIN_DIR*") {
+        Write-Info "Adding SealBridge bin directory to PATH..."
+        [System.Environment]::SetEnvironmentVariable("Path", "$userPath;$BIN_DIR", "User")
+        $env:Path = "$env:Path;$BIN_DIR"
+        Write-Info "✅ Added $BIN_DIR to PATH"
+    }
+    
     # Check for uv
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
         Write-Info "Installing 'uv'..."
