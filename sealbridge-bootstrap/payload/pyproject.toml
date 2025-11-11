@@ -7,8 +7,7 @@ name = "sbboot"
 version = "0.1.0"
 description = "SealBridge Bootstrap: Two-gate workstation bootstrap utility."
 authors = [{ name = "SealBridge", email = "dev@sealbridge.dev" }]
-license = "MIT"
-readme = "../README.md"
+license = { text = "Proprietary" }
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
