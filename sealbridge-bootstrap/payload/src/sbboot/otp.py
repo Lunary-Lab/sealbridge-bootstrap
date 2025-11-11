@@ -15,20 +15,16 @@ from .errors import ConfigError, OtpError
 console = Console(stderr=True)
 
 
-def _get_client_secret(config: OtpGateConfig) -> str:
+def _get_client_secret(config: OtpGateConfig) -> str | None:
     """
     Retrieve the client secret from the environment variable specified in the config.
+    
+    Returns None if not set, allowing for true 2FA (TOTP-only) verification.
 
-    Raises:
-        ConfigError: If the environment variable is not set.
+    Returns:
+        The client secret if available, None otherwise.
     """
-    secret = os.environ.get(config.client_secret_env)
-    if not secret:
-        raise ConfigError(
-            f"OTP gate client secret not found. "
-            f"Please set the '{config.client_secret_env}' environment variable."
-        )
-    return secret
+    return os.environ.get(config.client_secret_env)
 
 
 def _redact(data: Dict) -> Dict:
@@ -61,8 +57,8 @@ def verify_totp_code(
 
     Raises:
         OtpError: If a non-transient error occurs or retries are exhausted.
-        ConfigError: If the client secret is not found in the environment.
     """
+    # For true 2FA, client secret is optional - only TOTP code is required
     client_secret = _get_client_secret(config)
     payload = {
         "user": "bootstrap",  # OTP gate expects 'user' field
@@ -76,8 +72,9 @@ def verify_totp_code(
         for attempt in range(max_retries):
             try:
                 console.log(f"Attempting OTP verification (attempt {attempt + 1}/{max_retries})...")
-                # OTP gate uses Basic auth with client_id:client_secret
-                auth = (config.client_id, client_secret)
+                # OTP gate supports optional Basic auth - if client_secret is available, use it
+                # Otherwise, send request without authentication (true 2FA)
+                auth = (config.client_id, client_secret) if client_secret else None
                 response = client.post(str(config.url), json=payload, auth=auth)
                 response.raise_for_status()
 
