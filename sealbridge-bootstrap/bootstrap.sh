@@ -186,31 +186,36 @@ main() {
         fi
     fi
 
-    # Use system Python - don't try to install via uv (avoids SSL/certificate issues)
-    _info "Checking for Python 3.11+..."
-    PYTHON_CMD=""
+    # Install Python 3.11 via uv (required - cannot use system Python)
+    _info "Installing Python 3.11 via uv..."
     
-    # Check for python3.11 first
-    if command -v python3.11 >/dev/null 2>&1; then
-        PYTHON_CMD="python3.11"
-        _info "Found system Python 3.11"
-    elif command -v python3 >/dev/null 2>&1; then
-        # Check if python3 is 3.11+
-        PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
-        PYTHON_MAJOR=$(echo "$PYTHON_VER" | cut -d. -f1)
-        PYTHON_MINOR=$(echo "$PYTHON_VER" | cut -d. -f2)
-        if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
-            PYTHON_CMD="python3"
-            _info "Found system Python $PYTHON_VER"
-        else
-            _err "System Python version $PYTHON_VER is too old. Need Python 3.11+. Please install Python 3.11+."
+    # Set SSL certificate bundle if on macOS (fixes certificate issues)
+    if [ "$(uname)" = "Darwin" ]; then
+        # macOS may need explicit certificate path
+        export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}"
+        if [ ! -f "$SSL_CERT_FILE" ]; then
+            # Try alternative locations
+            for cert_path in \
+                "/usr/local/etc/openssl/cert.pem" \
+                "/opt/homebrew/etc/openssl/cert.pem" \
+                "/System/Library/OpenSSL/certs/cert.pem"; do
+                if [ -f "$cert_path" ]; then
+                    export SSL_CERT_FILE="$cert_path"
+                    break
+                fi
+            done
         fi
-    else
-        _err "No Python 3.11+ found. Please install Python 3.11+."
+        # Also set for curl/openssl
+        export CURL_CA_BUNDLE="$SSL_CERT_FILE"
     fi
-
-    _info "Creating Python virtual environment with $PYTHON_CMD..."
-    uv venv --python "$PYTHON_CMD"
+    
+    # Install Python 3.11 via uv
+    if ! uv python install 3.11 2>&1; then
+        _err "Failed to install Python 3.11 via uv. This is required. Please check your network connection and SSL certificates."
+    fi
+    
+    _info "Creating Python virtual environment with Python 3.11..."
+    uv venv --python 3.11
 
     _info "Installing dependencies..."
     uv pip sync requirements.lock
