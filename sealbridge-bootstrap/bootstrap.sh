@@ -169,12 +169,38 @@ main() {
 
     cd "$APP_CACHE_DIR"
 
-    if ! command -v "uv" >/dev/null 2>&1; then
+    # Check for existing uv installation (common locations)
+    UV_CMD=""
+    for uv_path in \
+        "$HOME/.local/bin/uv" \
+        "$HOME/.cargo/bin/uv" \
+        "/usr/local/bin/uv" \
+        "/opt/homebrew/bin/uv"; do
+        if [ -x "$uv_path" ]; then
+            UV_CMD="$uv_path"
+            _info "Found existing uv at $uv_path"
+            export PATH="$(dirname "$uv_path"):$PATH"
+            break
+        fi
+    done
+    
+    # If not found, check PATH
+    if [ -z "$UV_CMD" ] && command -v "uv" >/dev/null 2>&1; then
+        UV_CMD="uv"
+        _info "Found uv in PATH"
+    fi
+    
+    # Install uv if not found
+    if [ -z "$UV_CMD" ]; then
         _info "Installing 'uv'..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
         # Add cargo bin to PATH if it exists (uv installer places uv in ~/.cargo/bin)
         if [ -d "$HOME/.cargo/bin" ]; then
             export PATH="$HOME/.cargo/bin:$PATH"
+        fi
+        # Also check ~/.local/bin (newer uv installers)
+        if [ -d "$HOME/.local/bin" ]; then
+            export PATH="$HOME/.local/bin:$PATH"
         fi
         # Source cargo env if it exists (uv installer may add uv to PATH directly)
         if [ -f "$HOME/.cargo/env" ]; then
@@ -184,24 +210,45 @@ main() {
         if ! command -v "uv" >/dev/null 2>&1; then
             _err "uv installation failed. Please install uv manually: https://github.com/astral-sh/uv"
         fi
+        UV_CMD="uv"
     fi
 
     # Install Python 3.11 via uv (required - cannot use system Python)
     _info "Installing Python 3.11 via uv..."
     
     # Check if Python 3.11 is already installed via uv
-    if uv python list 3.11 2>/dev/null | grep -q "3.11"; then
+    if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
         _info "Python 3.11 already installed via uv"
+        PYTHON_SPEC="3.11"
     else
-        # Install Python 3.11 via uv (uv handles SSL/certificates automatically)
+        # Try to install Python 3.11 via uv
+        # On macOS with corporate proxies, uv may fail due to SSL certificate issues
+        # Try with system certificate store first
         _info "Downloading Python 3.11 (this may take a moment)..."
-        if ! uv python install 3.11; then
-            _err "Failed to install Python 3.11 via uv. This is required."
+        
+        # Set environment variables to help with SSL/certificate issues on macOS
+        if [ "$(uname)" = "Darwin" ]; then
+            # Try to use system certificates
+            export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}"
+            # macOS may have certificates in keychain - try to export them
+            if [ -f "/etc/ssl/cert.pem" ]; then
+                export SSL_CERT_FILE="/etc/ssl/cert.pem"
+            elif security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain >/dev/null 2>&1; then
+                # Try to use system keychain
+                export SSL_CERT_FILE=""
+            fi
+        fi
+        
+        if "$UV_CMD" python install 3.11 2>&1; then
+            PYTHON_SPEC="3.11"
+            _info "Python 3.11 installed successfully"
+        else
+            _err "Failed to install Python 3.11 via uv. This may be due to SSL certificate issues with corporate proxies. Please ensure your system certificates are up to date or install Python 3.11 manually."
         fi
     fi
     
-    _info "Creating Python virtual environment with Python 3.11..."
-    uv venv --python 3.11
+    _info "Creating Python virtual environment with Python $PYTHON_SPEC..."
+    "$UV_CMD" venv --python "$PYTHON_SPEC"
 
     _info "Installing dependencies..."
     uv pip sync requirements.lock
