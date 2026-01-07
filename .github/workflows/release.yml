@@ -73,7 +73,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . -c .gitleaks.toml --verbose --redact --exit-code 1
+          gitleaks detect --source . --verbose --redact --exit-code 1
 
   build-and-release:
     name: Build and Release
@@ -165,7 +165,7 @@ jobs:
           
           # Scan all extracted artifacts
           if [ -d "/tmp/artifacts" ] && [ "$(find /tmp/artifacts -type d -name 'extracted_*' | head -1)" ]; then
-            gitleaks detect --source /tmp/artifacts -c .gitleaks.toml --verbose --redact --exit-code 1 || {
+            gitleaks detect --source /tmp/artifacts --verbose --redact --exit-code 1 || {
               echo "❌ Secrets detected in release artifacts!"
               exit 1
             }

@@ -81,7 +81,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . -c .gitleaks.toml --verbose --redact --exit-code 1
+          gitleaks detect --source . --verbose --redact --exit-code 1
 
   e2e-macos:
     name: E2E Tests - macOS
