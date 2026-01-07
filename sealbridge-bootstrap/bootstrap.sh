@@ -239,7 +239,8 @@ main() {
     # Check if Python 3.11 is already installed via uv
     # Temporarily disable exit on error for this check
     set +e
-    PYTHON_CHECK_OUTPUT="$("$UV_CMD" python list 3.11 2>&1)"
+    # Use --native-tls for network operations on macOS to handle corporate proxies
+    PYTHON_CHECK_OUTPUT="$("$UV_CMD" python list 3.11 --installed 2>&1)"
     PYTHON_CHECK_EXIT=$?
     set -e
     
@@ -252,118 +253,18 @@ main() {
         # uv uses rustls which may not use the macOS system certificate store
         _info "Downloading Python 3.11 (this may take a moment)..."
         
-        # On macOS, try to export certificates from keychain for rustls
-        if [ "$(uname)" = "Darwin" ]; then
-            # Create a temporary certificate bundle from macOS keychain
-            # This helps rustls (used by uv) access system certificates
-            CERT_BUNDLE=""
-            if command -v security >/dev/null 2>&1; then
-                CERT_BUNDLE="$(mktemp)"
-                # Export system root certificates to a PEM file
-                security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain > "$CERT_BUNDLE" 2>/dev/null || true
-                # Also try to get user certificates if available
-                security find-certificate -a -p /Library/Keychains/System.keychain >> "$CERT_BUNDLE" 2>/dev/null || true
-                
-                if [ -s "$CERT_BUNDLE" ]; then
-                    export SSL_CERT_FILE="$CERT_BUNDLE"
-                    export REQUESTS_CA_BUNDLE="$CERT_BUNDLE"
-                    export CURL_CA_BUNDLE="$CERT_BUNDLE"
-                    _info "Using system certificates from macOS keychain"
-                else
-                    rm -f "$CERT_BUNDLE"
-                    CERT_BUNDLE=""
-                fi
-            fi
-        fi
-        
-        # Try to install Python via uv
+        # Try to install Python via uv with native-tls
         # Temporarily disable exit on error to capture the error
         set +e
-        UV_OUTPUT="$("$UV_CMD" python install 3.11 2>&1)"
+        UV_OUTPUT="$("$UV_CMD" python install 3.11 --native-tls 2>&1)"
         UV_EXIT=$?
         set -e
-        
-        # Clean up temporary certificate bundle
-        if [ -n "$CERT_BUNDLE" ] && [ -f "$CERT_BUNDLE" ]; then
-            rm -f "$CERT_BUNDLE"
-        fi
         
         if [ $UV_EXIT -eq 0 ]; then
             PYTHON_SPEC="3.11"
             _info "Python 3.11 installed successfully"
         else
-            # Check if it's an SSL certificate error
-            if echo "$UV_OUTPUT" | grep -qi "certificate\|SSL\|TLS\|peer certificate"; then
-                _warn "uv failed due to SSL certificate issues (likely corporate proxy/firewall)"
-                _warn "Attempting workaround: downloading Python manually with curl..."
-                
-                # Workaround: Use curl (which uses system certificates) to download Python
-                # Then tell uv to use it
-                PYTHON_VERSION="3.11.14"
-                ARCH="$(uname -m)"
-                if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-                    ARCH_SUFFIX="aarch64-apple-darwin"
-                else
-                    ARCH_SUFFIX="x86_64-apple-darwin"
-                fi
-                
-                # Get the latest Python 3.11 version from uv's known versions
-                # Try common recent versions
-                for PYTHON_VERSION in "3.11.14" "3.11.13" "3.11.12" "3.11.11" "3.11.10"; do
-                    ARCH="$(uname -m)"
-                    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-                        ARCH_SUFFIX="aarch64-apple-darwin"
-                    else
-                        ARCH_SUFFIX="x86_64-apple-darwin"
-                    fi
-                    
-                    # Try different release dates (uv uses specific build dates)
-                    for BUILD_DATE in "20251205" "20251124" "20251110"; do
-                        PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${BUILD_DATE}/cpython-${PYTHON_VERSION}+${BUILD_DATE}-${ARCH_SUFFIX}-install_only_stripped.tar.gz"
-                        PYTHON_TAR="$(mktemp)"
-                        
-                        _info "Trying to download Python ${PYTHON_VERSION} (build ${BUILD_DATE}) via curl..."
-                        if curl -fsSL "$PYTHON_URL" -o "$PYTHON_TAR" && [ -s "$PYTHON_TAR" ]; then
-                            _info "Downloaded Python via curl, extracting..."
-                            # Extract to uv's Python directory structure
-                            # uv stores Python as: ~/.local/share/uv/python/cpython-{version}+{date}-{arch}/
-                            UV_PYTHON_BASE="$HOME/.local/share/uv/python"
-                            PYTHON_DIR_NAME="cpython-${PYTHON_VERSION}+${BUILD_DATE}-${ARCH_SUFFIX}"
-                            mkdir -p "$UV_PYTHON_BASE/$PYTHON_DIR_NAME"
-                            
-                            # Extract the tarball
-                            if tar -xzf "$PYTHON_TAR" -C "$UV_PYTHON_BASE/$PYTHON_DIR_NAME" 2>/dev/null; then
-                                rm -f "$PYTHON_TAR"
-                                
-                                # Verify uv can see it
-                                set +e
-                                PYTHON_VERIFY_OUTPUT="$("$UV_CMD" python list 3.11 2>&1)"
-                                PYTHON_VERIFY_EXIT=$?
-                                set -e
-                                if [ $PYTHON_VERIFY_EXIT -eq 0 ] && echo "$PYTHON_VERIFY_OUTPUT" | grep -q "3.11"; then
-                                    PYTHON_SPEC="3.11"
-                                    _info "Python 3.11 installed successfully via workaround"
-                                    break 2
-                                else
-                                    _warn "Python extracted but uv cannot detect it, trying next version..."
-                                    rm -rf "$UV_PYTHON_BASE/$PYTHON_DIR_NAME"
-                                fi
-                            else
-                                rm -f "$PYTHON_TAR"
-                                _warn "Failed to extract Python tarball, trying next version..."
-                            fi
-                        else
-                            rm -f "$PYTHON_TAR"
-                        fi
-                    done
-                done
-                
-                if [ -z "$PYTHON_SPEC" ]; then
-                    _err "Failed to install Python 3.11 via workaround. SSL certificate issues detected. Please install Python 3.11 manually or configure your system certificates."
-                fi
-            else
-                _err "Failed to install Python 3.11 via uv: $UV_OUTPUT"
-            fi
+            _err "Failed to install Python 3.11 via uv: $UV_OUTPUT"
         fi
     fi
     
