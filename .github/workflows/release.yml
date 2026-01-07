@@ -64,7 +64,7 @@ jobs:
           TEST_SHARED_SECRET: "test-shared-secret-67890"
         run: |
           source .venv/bin/activate
-          pytest tests/e2e/ -v --tb=short -m "e2e and not full_system"
+          pytest tests/e2e/test_bootstrap_flow.py -v --tb=short -m e2e
       
       - name: Run Full System E2E tests (REQUIRED for release)
         working-directory: sealbridge-bootstrap/payload

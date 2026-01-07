@@ -20,13 +20,14 @@ TEST_GOOGLE_CLIENT_SECRET = os.getenv("E2E_GOOGLE_CLIENT_SECRET")
 TEST_GOOGLE_REFRESH_TOKEN = os.getenv("E2E_GOOGLE_REFRESH_TOKEN")
 
 # Skip if test infrastructure not available
-REQUIRES_TEST_INFRA = pytest.mark.skipif(
-    not all([TEST_GITHUB_TOKEN, TEST_DOTFILES_REPO]),
-    reason="Test infrastructure not configured (E2E_GITHUB_TOKEN, E2E_DOTFILES_REPO required)"
-)
+def requires_test_infra(func):
+    """Skip test if test infrastructure not available."""
+    return pytest.mark.skipif(
+        not all([TEST_GITHUB_TOKEN, TEST_DOTFILES_REPO]),
+        reason="Test infrastructure not configured (E2E_GITHUB_TOKEN, E2E_DOTFILES_REPO required)"
+    )(func)
 
 
-@REQUIRES_TEST_INFRA
 @pytest.fixture(scope="module")
 def docker_client():
     try:
@@ -38,6 +39,7 @@ def docker_client():
 
 
 @REQUIRES_TEST_INFRA
+@requires_test_infra
 @pytest.fixture(scope="module")
 def bootstrap_image(docker_client):
     image_tag = "sealbridge-bootstrap-full-system:latest"

@@ -48,7 +48,7 @@ jobs:
         run: |
           source .venv/bin/activate
           # Run isolated tests (no external dependencies)
-          pytest tests/e2e/ -v --tb=short -m "e2e and not full_system"
+          pytest tests/e2e/test_bootstrap_flow.py -v --tb=short -m e2e
       
       - name: Run Full System E2E tests (if test infrastructure available)
         working-directory: sealbridge-bootstrap/payload
