@@ -9,7 +9,7 @@ import truststore
 import typer
 from rich.console import Console
 
-from . import __version__, config, errors, paths
+from . import __version__, config, errors, paths as paths_lib
 from .errors import ConfigError, SealBridgeError, SealreposError
 
 app = typer.Typer(
@@ -35,7 +35,7 @@ def main(
         None,
         "--config",
         "-c",
-        help=f"Path to the bootstrap.yaml configuration file. [default: {paths.get_default_config_path()}]",
+        help=f"Path to the bootstrap.yaml configuration file. [default: {paths_lib.get_default_config_path()}]",
         resolve_path=True,
     ),
     version: bool | None = typer.Option(
@@ -169,7 +169,7 @@ def run(
         if cfg.git.extra_repos:
             console.print("\n[bold]Cloning extra repositories...[/bold]")
             for repo in cfg.git.extra_repos:
-                dest_dir = paths.HOME / "workspace" / repo.name
+                dest_dir = paths_lib.HOME / "workspace" / repo.name
                 gitwrap.clone(repo.url, dest_dir, policy_manager, cfg.git.branch)
 
         console.print(
@@ -266,7 +266,7 @@ def decrypt_age_key(ctx: typer.Context, master_password: str, shared_secret: str
             # Re-reading WARP.md: "Decrypts: `age_key.enc` -> `~/.config/chezmoi/key.txt`."
             # So we should write it to disk, NOT add to ssh-agent (unless it's also an SSH key).
 
-            target_key_file = paths.get_xdg_config_home() / "chezmoi" / "key.txt"
+            target_key_file = paths_lib.get_xdg_config_home() / "chezmoi" / "key.txt"
             target_key_file.parent.mkdir(parents=True, exist_ok=True)
             target_key_file.write_text(decrypted_key)
             target_key_file.chmod(0o600)
@@ -321,17 +321,17 @@ def paths(ctx: typer.Context):
     import orjson
 
     data = {
-        "HOME": str(paths.HOME),
-        "XDG_DATA_HOME": str(paths.get_xdg_data_home()),
-        "XDG_CONFIG_HOME": str(paths.get_xdg_config_home()),
-        "XDG_STATE_HOME": str(paths.get_xdg_state_home()),
-        "XDG_CACHE_HOME": str(paths.get_xdg_cache_home()),
-        "app_data_dir": str(paths.get_app_data_dir()),
-        "app_config_dir": str(paths.get_app_config_dir()),
-        "app_state_dir": str(paths.get_app_state_dir()),
-        "app_cache_dir": str(paths.get_app_cache_dir()),
-        "bin_dir": str(paths.get_bin_dir()),
-        "default_config_path": str(paths.get_default_config_path()),
+        "HOME": str(paths_lib.HOME),
+        "XDG_DATA_HOME": str(paths_lib.get_xdg_data_home()),
+        "XDG_CONFIG_HOME": str(paths_lib.get_xdg_config_home()),
+        "XDG_STATE_HOME": str(paths_lib.get_xdg_state_home()),
+        "XDG_CACHE_HOME": str(paths_lib.get_xdg_cache_home()),
+        "app_data_dir": str(paths_lib.get_app_data_dir()),
+        "app_config_dir": str(paths_lib.get_app_config_dir()),
+        "app_state_dir": str(paths_lib.get_app_state_dir()),
+        "app_cache_dir": str(paths_lib.get_app_cache_dir()),
+        "bin_dir": str(paths_lib.get_bin_dir()),
+        "default_config_path": str(paths_lib.get_default_config_path()),
     }
     print(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
 
@@ -347,11 +347,11 @@ def doctor(ctx: typer.Context):
 
     try:
         paths_json = {
-            "HOME": str(paths.HOME),
-            "XDG_DATA_HOME": str(paths.get_xdg_data_home()),
-            "XDG_CONFIG_HOME": str(paths.get_xdg_config_home()),
-            "XDG_STATE_HOME": str(paths.get_xdg_state_home()),
-            "XDG_CACHE_HOME": str(paths.get_xdg_cache_home()),
+            "HOME": str(paths_lib.HOME),
+            "XDG_DATA_HOME": str(paths_lib.get_xdg_data_home()),
+            "XDG_CONFIG_HOME": str(paths_lib.get_xdg_config_home()),
+            "XDG_STATE_HOME": str(paths_lib.get_xdg_state_home()),
+            "XDG_CACHE_HOME": str(paths_lib.get_xdg_cache_home()),
         }
         console.print("✅ [green]XDG Paths are resolved.[/green]")
         console.print(paths_json)
@@ -377,7 +377,7 @@ def doctor(ctx: typer.Context):
     )
     try:
         # Use bundled certificate if available, otherwise use system trust store
-        cert_path = paths.get_otp_gate_cert_path()
+        cert_path = paths_lib.get_otp_gate_cert_path()
         if cert_path:
             # Convert Path to string for httpx (trusts ONLY this self-signed certificate)
             verify_ssl = str(cert_path)

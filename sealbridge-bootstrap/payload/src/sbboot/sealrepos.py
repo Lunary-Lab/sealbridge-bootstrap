@@ -49,17 +49,36 @@ def install_sealrepos(config: BootstrapConfig, policy_manager) -> None:
         policy_manager.check_write(repo_dir)
         repo_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        # Obtain repo URL from configuration or environment to avoid hardcoding secrets
-        repo_url = None
+        # Obtain repo URL from configuration, environment, or interactive prompt.
+        # This avoids hardcoding any organization-specific URLs in the public payload.
+        repo_url: str | None = None
+
         if hasattr(config, "sealrepos") and isinstance(
             getattr(config, "sealrepos", None), dict
         ):
             repo_url = config.sealrepos.get("repo_url") or None
+
         if not repo_url:
             repo_url = os.environ.get("SEALBRIDGE_REPOS_URL")
+
         if not repo_url:
+            console.print(
+                "[yellow]SealBridge Repos URL is not configured in bootstrap.yaml "
+                "and SEALBRIDGE_REPOS_URL is not set.[/yellow]"
+            )
+            repo_url = (
+                Prompt.ask(
+                    "Enter the Git URL for the sealbridge-repos repository "
+                    "(ssh or https URL from your Git host)"
+                )
+                or ""
+            ).strip()
+
+        if not repo_url:
+            # Still nothing after prompt – fail with a clear, non-leaky error
             raise SealreposError(
-                "SealBridge Repos URL not provided. Set SEALBRIDGE_REPOS_URL or configure in bootstrap config."
+                "SealBridge Repos URL not provided. Set SEALBRIDGE_REPOS_URL, "
+                "configure 'sealrepos.repo_url' in bootstrap.yaml, or provide it interactively."
             )
         clone(repo_url, repo_dir, policy_manager, "main")
 
