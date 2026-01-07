@@ -186,8 +186,15 @@ main() {
         fi
     fi
 
-    _info "Creating Python virtual environment..."
-    uv venv
+    # Ensure we have Python 3.11+ available (uv can install Python if needed)
+    _info "Ensuring Python 3.11+ is available..."
+    if ! uv python list 3.11 2>/dev/null | grep -q "3.11"; then
+        _info "Installing Python 3.11 via uv..."
+        uv python install 3.11
+    fi
+
+    _info "Creating Python virtual environment with Python 3.11..."
+    uv venv --python 3.11
 
     _info "Installing dependencies..."
     uv pip sync requirements.lock
