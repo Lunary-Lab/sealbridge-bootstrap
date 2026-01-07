@@ -26,8 +26,9 @@ jobs:
           uv venv
           source .venv/bin/activate
           uv pip sync requirements.lock
-          uv run ruff check .
-          uv run ruff format --check .
+          uv pip install ruff
+          ruff check .
+          ruff format --check .
 
   type-check:
     name: Static Type Check
@@ -43,7 +44,8 @@ jobs:
           uv venv
           source .venv/bin/activate
           uv pip sync requirements.lock
-          uv run mypy src/
+          uv pip install mypy
+          mypy src/
 
   unit-tests:
     name: Unit Tests
@@ -60,7 +62,7 @@ jobs:
           source .venv/bin/activate
           uv pip install "pytest" "pytest-mock"
           uv pip sync requirements.lock
-          uv run pytest tests/unit
+          pytest tests/unit
 
   secrets-scan:
     name: Secrets Scanning
@@ -82,4 +84,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1
+          gitleaks detect --source . --config-path .gitleaks.toml --verbose --redact --exit-code 1

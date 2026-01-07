@@ -30,7 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1
+          gitleaks detect --source . --config-path .gitleaks.toml --verbose --redact --exit-code 1
       
       - name: Install GitHub CLI
         if: github.event_name == 'release'

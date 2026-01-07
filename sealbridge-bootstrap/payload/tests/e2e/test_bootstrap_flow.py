@@ -26,11 +26,12 @@ def bootstrap_image(docker_client):
     image_tag = "sealbridge-bootstrap-e2e:latest"
     # Path to repo root (3 levels up from test file)
     repo_root = Path(__file__).parent.parent.parent.parent.parent
+    dockerfile_path = repo_root / "sealbridge-bootstrap" / "payload" / "tests" / "e2e" / "Dockerfile.ubuntu"
 
     try:
         image, logs = docker_client.images.build(
             path=str(repo_root),
-            dockerfile="sealbridge-bootstrap/payload/tests/e2e/Dockerfile.ubuntu",
+            dockerfile=str(dockerfile_path.relative_to(repo_root)),
             tag=image_tag,
             rm=True
         )
