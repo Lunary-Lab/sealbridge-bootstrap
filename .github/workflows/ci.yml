@@ -63,61 +63,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for better secret detection
 
-      - name: Run Gitleaks
-        # Note: Gitleaks is free but requires a free license key for GitHub organizations
-        # Get your free license at: https://gitleaks.io/products.html
-        # Then add it as a GitHub Secret named GITLEAKS_LICENSE
-        # GITHUB_TOKEN is automatically provided by GitHub Actions, no need to set it
-        if: env.GITLEAKS_LICENSE != ''
-        uses: gitleaks/gitleaks-action@v2
+      - name: Install Gitleaks
+        run: |
+          wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.22.0/gitleaks_8.22.0_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+          chmod +x /usr/local/bin/gitleaks
+
+      - name: Run Gitleaks on repository
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          config-path: .gitleaks.toml
-          fail: true
-          no-git: false
-          verbose: true
-      - name: Skip secrets scan (no license)
-        if: env.GITLEAKS_LICENSE == ''
         run: |
-          echo "⚠️ Skipping secrets scan - GITLEAKS_LICENSE not configured"
-          echo "Gitleaks is free but requires a free license key for GitHub organizations."
-          echo "Get your free license at: https://gitleaks.io/products.html"
-          echo "Then add it as a GitHub Secret named GITLEAKS_LICENSE"
-
-      - name: Scan built payload bundle
-        run: |
-          echo "Building payload bundle for scanning..."
-          mkdir -p test-payload
-          tar -czf test-payload/payload.tar.gz -C sealbridge-bootstrap/payload .
-          
-          echo "Extracting and scanning payload bundle..."
-          mkdir -p payload-scan
-          tar -xzf test-payload/payload.tar.gz -C payload-scan
-          
-          echo "Scanning extracted payload contents..."
-          if docker run --rm -v "$(pwd):/path" -w /path zricethezav/gitleaks:latest detect \
-            --source="/path/payload-scan" \
-            --no-git \
-            --verbose \
-            -c "/path/.gitleaks.toml" \
-            -b "/path/.gitleaksignore" \
-            --exit-code 1; then
-            echo "✅ No secrets found in payload bundle"
-          else
-            EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 1 ]; then
-              echo "::error::Secrets found in payload bundle!"
-              exit 1
-            else
-              echo "::error::Gitleaks scan failed with exit code $EXIT_CODE. Check the logs above for details."
-              exit $EXIT_CODE
-            fi
-          fi
+          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1

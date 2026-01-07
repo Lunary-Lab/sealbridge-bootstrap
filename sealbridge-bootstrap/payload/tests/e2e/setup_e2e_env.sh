@@ -41,40 +41,8 @@ echo "Generating encrypted test key..."
 AGE_KEY_PLAINTEXT="AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890"
 # Use Python to encrypt it with the new 2FA method (master password + shared secret)
 # Note: We need to set up the Python environment first
-cd /app/payload
-python3 << 'PYTHON_SCRIPT'
-import sys
-from pathlib import Path
-
-# Add the src directory to Python path
-sys.path.insert(0, str(Path("/app/payload/src")))
-
-try:
-    from sbboot.security import encrypt_data
-except ImportError:
-    # If import fails, we'll create it after venv is set up
-    # This will be handled by the test itself
-    print("Note: sbboot modules not yet available, will be created during test")
-    sys.exit(0)
-
-# Test credentials (FAKE - only for e2e testing)
-MASTER_PASSWORD = "test-master-password-12345"
-SHARED_SECRET = "test-shared-secret-67890"
-
-AGE_KEY_PLAINTEXT = "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\n"
-
-# Encrypt using the new 2FA approach
-encrypted_data = encrypt_data(
-    AGE_KEY_PLAINTEXT.encode('utf-8'),
-    MASTER_PASSWORD,
-    SHARED_SECRET
-)
-
-# Write encrypted key
-output_path = Path("/tmp/age_key.enc")
-output_path.write_bytes(encrypted_data)
-print(f"✅ Created encrypted age key at {output_path}")
-PYTHON_SCRIPT
+# Note: Key creation will happen during Docker build after venv is set up
+# The create_encrypted_key.py script will be run in the Dockerfile
 
 # If the Python script couldn't import (venv not ready), create a helper script
 # that will be run after the venv is set up

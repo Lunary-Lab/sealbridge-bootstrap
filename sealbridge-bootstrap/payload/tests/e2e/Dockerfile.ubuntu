@@ -43,7 +43,24 @@ RUN uv venv && \
     . .venv/bin/activate && \
     uv pip sync requirements.lock && \
     uv pip install -e . && \
-    # Create encrypted age key for testing after venv is ready
-    python3 /tmp/create_encrypted_key.py || echo "Key creation will happen during test"
+    python3 << 'PYEOF'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path("/app/payload/src")))
+from sbboot.security import encrypt_data
+
+MASTER_PASSWORD = "test-master-password-12345"
+SHARED_SECRET = "test-shared-secret-67890"
+AGE_KEY_PLAINTEXT = "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\n"
+
+encrypted_data = encrypt_data(
+    AGE_KEY_PLAINTEXT.encode('utf-8'),
+    MASTER_PASSWORD,
+    SHARED_SECRET
+)
+
+Path("/tmp/age_key.enc").write_bytes(encrypted_data)
+print("✅ Created encrypted age key")
+PYEOF
 
 CMD ["/bin/bash"]
