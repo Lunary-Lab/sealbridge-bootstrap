@@ -29,8 +29,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/tester/.cargo/bin:${PATH}"
 
 # Copy the application payload and test assets
-COPY --chown=tester:tester ./payload /app/payload
-COPY --chown=tester:tester ./payload/tests/e2e/setup_e2e_env.sh /app/setup_e2e_env.sh
+COPY --chown=tester:tester ./sealbridge-bootstrap/payload /app/payload
+COPY --chown=tester:tester ./sealbridge-bootstrap/payload/tests/e2e/setup_e2e_env.sh /app/setup_e2e_env.sh
 
 # Run the setup script to prepare the E2E environment
 USER root
