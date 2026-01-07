@@ -221,9 +221,18 @@ main() {
     _info "Installing Python 3.11 via uv..."
     
     # Check if Python 3.11 is already installed via uv
+    PYTHON_SPEC=""
     if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
         _info "Python 3.11 already installed via uv"
-        PYTHON_SPEC="3.11"
+        # Try to get the actual path to the installed Python
+        PYTHON_PATH="$("$UV_CMD" python list 3.11 2>/dev/null | grep "3.11" | head -1 | awk '{print $NF}' || echo "")"
+        if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
+            PYTHON_SPEC="$PYTHON_PATH"
+            _info "Using Python at: $PYTHON_PATH"
+        else
+            # Fall back to version specifier
+            PYTHON_SPEC="3.11"
+        fi
     else
         # Try to install Python 3.11 via uv
         # On macOS with corporate proxies, uv may fail due to SSL certificate issues
@@ -339,7 +348,34 @@ main() {
     fi
     
     _info "Creating Python virtual environment with Python $PYTHON_SPEC..."
-    "$UV_CMD" venv --python "$PYTHON_SPEC"
+    
+    # Try to create venv - if it fails with SSL error, use workaround
+    VENV_OUTPUT="$("$UV_CMD" venv --python "$PYTHON_SPEC" 2>&1)"
+    VENV_EXIT=$?
+    
+    if [ $VENV_EXIT -ne 0 ]; then
+        # Check if it's an SSL certificate error
+        if echo "$VENV_OUTPUT" | grep -qi "certificate\|SSL\|TLS\|peer certificate"; then
+            _warn "uv venv failed due to SSL certificate issues"
+            _warn "Python 3.11 is installed but uv cannot verify it. Trying workaround..."
+            
+            # If we have a Python path, try using it directly
+            if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
+                _info "Using Python directly: $PYTHON_PATH"
+                "$UV_CMD" venv --python "$PYTHON_PATH" || {
+                    _warn "Direct Python path failed, trying without --python flag..."
+                    # Last resort: let uv use whatever Python it finds
+                    "$UV_CMD" venv || _err "Failed to create virtual environment"
+                }
+            else
+                # Try without specifying Python version - let uv use what it finds
+                _warn "Trying to create venv without specifying Python version..."
+                "$UV_CMD" venv || _err "Failed to create virtual environment. SSL certificate issues detected."
+            fi
+        else
+            _err "Failed to create virtual environment: $VENV_OUTPUT"
+        fi
+    fi
 
     _info "Installing dependencies..."
     uv pip sync requirements.lock
