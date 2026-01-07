@@ -4,13 +4,15 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-# In GitHub Actions, we're in sealbridge-bootstrap directory, so path is different
+
+# Bootstrap script is at: repo-root/sealbridge-bootstrap/sealbridge-bootstrap/bootstrap.sh
+# Test script is at: repo-root/sealbridge-bootstrap/sealbridge-bootstrap/payload/tests/e2e/test_bootstrap_script.sh
+# So from test script, bootstrap.sh is 3 levels up: ../../../
+BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/sealbridge-bootstrap/bootstrap.sh"
+
+# Also check if we're running from sealbridge-bootstrap directory (GitHub Actions)
 if [ -f "sealbridge-bootstrap/bootstrap.sh" ]; then
     BOOTSTRAP_SCRIPT="sealbridge-bootstrap/bootstrap.sh"
-elif [ -f "$REPO_ROOT/sealbridge-bootstrap/bootstrap.sh" ]; then
-    BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/bootstrap.sh"
-else
-    BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/sealbridge-bootstrap/bootstrap.sh"
 fi
 
 if [ ! -f "$BOOTSTRAP_SCRIPT" ]; then
