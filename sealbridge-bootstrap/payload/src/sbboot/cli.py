@@ -48,8 +48,15 @@ def main(
     """
     from . import logging
     try:
-        # Try to load config, but allow it to be missing for some commands
-        cfg = config.load_config(config_path, allow_missing=True)
+        # SAFETY: If --config is explicitly provided, use it and don't fall back to default
+        # This prevents accidentally loading real configs in test environments
+        if config_path:
+            # Explicit config path provided - use it and don't allow missing
+            cfg = config.load_config(config_path, allow_missing=False)
+        else:
+            # No explicit config - try default but allow missing for some commands
+            cfg = config.load_config(config_path, allow_missing=True)
+        
         if cfg:
             logging.setup_logging(cfg)
         ctx.obj = cfg

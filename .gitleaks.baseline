@@ -1,0 +1,42 @@
+[
+ {
+  "Description": "Generic API Key",
+  "StartLine": 9,
+  "EndLine": 9,
+  "StartColumn": 6,
+  "EndColumn": 106,
+  "Match": "KEY_PLAINTEXT = \"AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\"",
+  "Secret": "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890",
+  "File": "sealbridge-bootstrap/payload/tests/e2e/create_encrypted_key.py",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 4.0827622,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "sealbridge-bootstrap/payload/tests/e2e/create_encrypted_key.py:generic-api-key:9"
+ },
+ {
+  "Description": "Generic API Key",
+  "StartLine": 41,
+  "EndLine": 41,
+  "StartColumn": 6,
+  "EndColumn": 104,
+  "Match": "KEY_PLAINTEXT=\"AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\"",
+  "Secret": "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890",
+  "File": "sealbridge-bootstrap/payload/tests/e2e/setup_e2e_env.sh",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 4.0827622,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "sealbridge-bootstrap/payload/tests/e2e/setup_e2e_env.sh:generic-api-key:41"
+ }
+]

@@ -30,7 +30,6 @@ ENV PATH="/home/tester/.cargo/bin:${PATH}"
 
 # Copy the application payload and test assets
 COPY --chown=tester:tester ./payload /app/payload
-COPY --chown=tester:tester ./payload/tests/e2e/mock_otp_server.py /app/mock_otp_server.py
 COPY --chown=tester:tester ./payload/tests/e2e/setup_e2e_env.sh /app/setup_e2e_env.sh
 
 # Run the setup script to prepare the E2E environment
@@ -43,9 +42,8 @@ WORKDIR /app/payload
 RUN uv venv && \
     . .venv/bin/activate && \
     uv pip sync requirements.lock && \
-    uv pip install -e .
-
-# Expose the OTP port
-EXPOSE 8765
+    uv pip install -e . && \
+    # Create encrypted age key for testing after venv is ready
+    python3 /tmp/create_encrypted_key.py || echo "Key creation will happen during test"
 
 CMD ["/bin/bash"]

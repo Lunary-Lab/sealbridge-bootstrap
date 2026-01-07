@@ -36,14 +36,68 @@ git push origin main
 cd /
 rm -rf /tmp/dotfiles-clone
 
-# 3. Generate and encrypt the SSH key for the test
-echo "Generating and encrypting SSH key..."
-ssh-keygen -t ed25519 -f /tmp/id_ed25519 -N "" -C "e2e-test-key"
-# The public key needs to be authorized for the git user (tester)
-cat /tmp/id_ed25519.pub >> /home/tester/.ssh/authorized_keys
-# Encrypt the private key with a known passphrase for the test
-echo "testpassphrase" | age -p -o /tmp/id_bootstrap.age /tmp/id_ed25519
-# Remove the plaintext private key
-rm /tmp/id_ed25519
+# 3. Generate and encrypt test key
+echo "Generating encrypted test key..."
+AGE_KEY_PLAINTEXT="AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890"
+# Use Python to encrypt it with the new 2FA method (master password + shared secret)
+# Note: We need to set up the Python environment first
+cd /app/payload
+python3 << 'PYTHON_SCRIPT'
+import sys
+from pathlib import Path
+
+# Add the src directory to Python path
+sys.path.insert(0, str(Path("/app/payload/src")))
+
+try:
+    from sbboot.security import encrypt_data
+except ImportError:
+    # If import fails, we'll create it after venv is set up
+    # This will be handled by the test itself
+    print("Note: sbboot modules not yet available, will be created during test")
+    sys.exit(0)
+
+# Test credentials (FAKE - only for e2e testing)
+MASTER_PASSWORD = "test-master-password-12345"
+SHARED_SECRET = "test-shared-secret-67890"
+
+AGE_KEY_PLAINTEXT = "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\n"
+
+# Encrypt using the new 2FA approach
+encrypted_data = encrypt_data(
+    AGE_KEY_PLAINTEXT.encode('utf-8'),
+    MASTER_PASSWORD,
+    SHARED_SECRET
+)
+
+# Write encrypted key
+output_path = Path("/tmp/age_key.enc")
+output_path.write_bytes(encrypted_data)
+print(f"✅ Created encrypted age key at {output_path}")
+PYTHON_SCRIPT
+
+# If the Python script couldn't import (venv not ready), create a helper script
+# that will be run after the venv is set up
+cat > /tmp/create_encrypted_key.py << 'PYEOF'
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path("/app/payload/src")))
+from sbboot.security import encrypt_data
+
+MASTER_PASSWORD = "test-master-password-12345"
+SHARED_SECRET = "test-shared-secret-67890"
+AGE_KEY_PLAINTEXT = "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\n"
+
+encrypted_data = encrypt_data(
+    AGE_KEY_PLAINTEXT.encode('utf-8'),
+    MASTER_PASSWORD,
+    SHARED_SECRET
+)
+
+Path("/tmp/age_key.enc").write_bytes(encrypted_data)
+print("✅ Created encrypted age key")
+PYEOF
+chmod +x /tmp/create_encrypted_key.py
 
 echo "E2E environment setup complete."

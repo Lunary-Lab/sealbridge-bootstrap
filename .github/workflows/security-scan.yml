@@ -1,0 +1,98 @@
+name: Security Scan - Gitleaks
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  gitleaks-scan:
+    name: Gitleaks - Full History Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for scanning
+      
+      - name: Run Gitleaks on repository
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          no-git: false
+          verbose: true
+          redact: true
+          exit-code: 1
+      
+      - name: Install GitHub CLI
+        if: github.event_name == 'release'
+        run: |
+          type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt update && apt install gh -y
+      
+      - name: Scan release artifacts (if release)
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Download and scan release artifacts
+          echo "Scanning release artifacts for tag: ${{ github.event.release.tag_name }}"
+          
+          # Get release assets
+          mkdir -p /tmp/artifacts
+          gh release download "${{ github.event.release.tag_name }}" --dir /tmp/artifacts || echo "No artifacts found or already downloaded"
+          
+          # Extract and scan archives
+          cd /tmp/artifacts
+          for file in *.tar.gz *.zip; do
+            if [ -f "$file" ]; then
+              echo "Extracting and scanning: $file"
+              mkdir -p "extracted_$(basename "$file")"
+              if [[ "$file" == *.tar.gz ]]; then
+                tar -xzf "$file" -C "extracted_$(basename "$file")" || true
+              elif [[ "$file" == *.zip ]]; then
+                unzip -q "$file" -d "extracted_$(basename "$file")" || true
+              fi
+            fi
+          done
+          
+          # Scan all extracted artifacts
+          if [ -d "/tmp/artifacts" ]; then
+            gitleaks detect --source /tmp/artifacts --verbose --redact --exit-code 1 || {
+              echo "❌ Secrets detected in release artifacts!"
+              exit 1
+            }
+            echo "✅ No secrets detected in release artifacts"
+          fi
+
+  gitleaks-baseline:
+    name: Gitleaks - Baseline Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate baseline
+        run: |
+          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact || true
+      
+      - name: Upload baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-baseline
+          path: .gitleaks.baseline
+          retention-days: 1
+

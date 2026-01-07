@@ -1,4 +1,3 @@
-# .github/workflows/release.yml
 name: Release
 
 on:
@@ -7,77 +6,209 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
+  # Security checks must pass before release
+  security-check:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run Gitleaks on repository
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          no-git: false
+          verbose: true
+          redact: true
+          exit-code: 1
+  
+  # E2E tests must pass before release
+  e2e-linux-check:
+    name: E2E Tests - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Install Docker
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Set up test environment
+        working-directory: sealbridge-bootstrap/payload
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip sync requirements.lock
+          uv pip install -e .
+          uv pip install pytest pytest-docker
+      
+      - name: Run E2E tests (isolated)
+        working-directory: sealbridge-bootstrap/payload
+        env:
+          TEST_MASTER_PASSWORD: "test-master-password-12345"
+          TEST_SHARED_SECRET: "test-shared-secret-67890"
+        run: |
+          source .venv/bin/activate
+          pytest tests/e2e/ -v --tb=short -m "e2e and not full_system"
+      
+      - name: Run Full System E2E tests (REQUIRED for release)
+        working-directory: sealbridge-bootstrap/payload
+        env:
+          # Test infrastructure credentials (REQUIRED for release)
+          E2E_MASTER_PASSWORD: ${{ secrets.E2E_MASTER_PASSWORD }}
+          E2E_SHARED_SECRET: ${{ secrets.E2E_SHARED_SECRET }}
+          E2E_GITHUB_TOKEN: ${{ secrets.E2E_GITHUB_TOKEN }}
+          E2E_DOTFILES_REPO: ${{ secrets.E2E_DOTFILES_REPO }}
+          E2E_GOOGLE_CLIENT_ID: ${{ secrets.E2E_GOOGLE_CLIENT_ID }}
+          E2E_GOOGLE_CLIENT_SECRET: ${{ secrets.E2E_GOOGLE_CLIENT_SECRET }}
+          E2E_GOOGLE_REFRESH_TOKEN: ${{ secrets.E2E_GOOGLE_REFRESH_TOKEN }}
+        run: |
+          source .venv/bin/activate
+          # Full system tests are REQUIRED for release
+          pytest tests/e2e/test_full_system.py -v --tb=short -m full_system
+  
+  e2e-windows-check:
+    name: E2E Tests - Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install uv
+        run: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+      
+      - name: Add uv to PATH
+        run: |
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          echo "$env:Path" >> $env:GITHUB_PATH
+      
+      - name: Test bootstrap.ps1 script syntax
+        working-directory: sealbridge-bootstrap
+        shell: pwsh
+        run: |
+          $scriptPath = "bootstrap.ps1"
+          $errors = $null
+          $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content $scriptPath -Raw), [ref]$errors)
+          if ($errors.Count -gt 0) {
+            Write-Error "PowerShell syntax errors found:"
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ bootstrap.ps1 syntax is valid"
+  
   build-and-release:
     name: Build and Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    needs: [security-check, e2e-linux-check, e2e-windows-check]
+    if: success()
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          fetch-depth: 0
-
-      - id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Update Python package version
+          python-version: '3.11'
+      
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Build payload
+        working-directory: sealbridge-bootstrap/payload
         run: |
-          VERSION="${{ env.VERSION }}"
-          VERSION_NO_V="${VERSION#v}"
-          sed -i "s|^__version__ = \".*\"|__version__ = \"$VERSION_NO_V\"|" sealbridge-bootstrap/payload/src/sbboot/__init__.py
-          sed -i "s|^version = \".*\"|version = \"$VERSION_NO_V\"|" sealbridge-bootstrap/payload/pyproject.toml
-
-      - name: Create payload archive
+          uv venv
+          source .venv/bin/activate
+          uv pip sync requirements.lock
+          uv pip install -e .
+          # Build payload archive
+          cd ..
+          tar -czf payload.tar.gz -C payload .
+      
+      - name: Calculate checksum
+        id: checksum
         run: |
-          mkdir -p release
-          # Key is already in the repo, so we just bundle it.
-          if [ ! -f sealbridge-bootstrap/payload/bootstrap_identity.enc ]; then
-             echo "::error::bootstrap_identity.enc missing from payload!"
-             exit 1
-          fi
-          
-          tar -czf release/payload.tar.gz -C sealbridge-bootstrap/payload .
-
-      - id: checksums
+          SHA256=$(sha256sum sealbridge-bootstrap/payload.tar.gz | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "Checksum: $SHA256"
+      
+      - name: Update bootstrap scripts with version and checksum
+        working-directory: sealbridge-bootstrap
         run: |
-          cd release
-          SHA256_TAR=$(sha256sum payload.tar.gz | cut -d' ' -f1)
-          echo "SHA256_TAR=$SHA256_TAR" >> $GITHUB_ENV
-
-          echo "SHA256 Checksums for SealBridge Bootstrap version ${{ env.VERSION }}" > checksums.txt
-          echo "--------------------------------------------------" >> checksums.txt
-          echo "$SHA256_TAR  payload.tar.gz" >> checksums.txt
-
-      - name: Update bootstrap scripts with checksum and version
-        run: |
-          VERSION="${{ env.VERSION }}"
-          VERSION_NO_V="${VERSION#v}"
-          SHA256="${{ env.SHA256_TAR }}"
+          VERSION="${{ github.ref_name }}"
+          SHA256="${{ steps.checksum.outputs.sha256 }}"
           
           # Update bootstrap.sh
-          sed -i "s|^APP_VERSION=\".*\"|APP_VERSION=\"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.sh
-          sed -i "s|^PAYLOAD_URL=\".*\"|PAYLOAD_URL=\"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.sh
-          sed -i "s|^PAYLOAD_SHA256=\".*\"|PAYLOAD_SHA256=\"$SHA256\"|" sealbridge-bootstrap/bootstrap.sh
-
+          sed -i "s/APP_VERSION=\".*\"/APP_VERSION=\"${VERSION#v}\"/" bootstrap.sh
+          sed -i "s/PAYLOAD_SHA256=\".*\"/PAYLOAD_SHA256=\"${SHA256}\"/" bootstrap.sh
+          
           # Update bootstrap.ps1
-          sed -i "s|^\$APP_VERSION = \".*\"|\$APP_VERSION = \"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.ps1
-          sed -i "s|^\$PAYLOAD_URL = \".*\"|\$PAYLOAD_URL = \"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.ps1
-          sed -i "s|^\$PAYLOAD_SHA256 = \".*\"|\$PAYLOAD_SHA256 = \"$SHA256\"|" sealbridge-bootstrap/bootstrap.ps1
-
-      - uses: softprops/action-gh-release@v2
+          sed -i "s/\$APP_VERSION = \".*\"/\$APP_VERSION = \"${VERSION#v}\"/" bootstrap.ps1
+          sed -i "s/\$PAYLOAD_SHA256 = \".*\"/\$PAYLOAD_SHA256 = \"${SHA256}\"/" bootstrap.ps1
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
           files: |
-            release/payload.tar.gz
-            release/checksums.txt
+            sealbridge-bootstrap/payload.tar.gz
             sealbridge-bootstrap/bootstrap.sh
             sealbridge-bootstrap/bootstrap.ps1
-          body: |
-            SealBridge Bootstrap version ${{ env.VERSION }}
-
-            ## SHA256 Checksums
-            ```
-            ${{ env.SHA256_TAR }}  payload.tar.gz
-            ```
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install GitHub CLI
+        run: |
+          type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt update && apt install gh -y
+      
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin
+      
+      - name: Final security scan of release artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Download the release we just created and scan it
+          gh release download ${{ github.ref_name }} --dir /tmp/release-artifacts || true
+          
+          # Extract and scan
+          if [ -d "/tmp/release-artifacts" ]; then
+            cd /tmp/release-artifacts
+            if [ -f payload.tar.gz ]; then
+              mkdir -p extracted
+              tar -xzf payload.tar.gz -C extracted
+              gitleaks detect --source extracted --verbose --redact --exit-code 1 || {
+                echo "❌ CRITICAL: Secrets detected in release artifacts!"
+                exit 1
+              }
+            fi
+          fi

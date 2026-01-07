@@ -1,11 +1,5 @@
 version: 1
-profile: "work"  # or "home" - determines which dotfiles profile to apply
-
-# OTP Gate configuration - Where to verify TOTP codes during bootstrap
-otp_gate:
-  url: "http://127.0.0.1:8765/v1/verify"  # Replace with your OTP gate server URL
-  client_id: "bootstrap"
-  client_secret_env: "SB_BOOTSTRAP_CLIENT_SECRET"  # Must be set as environment variable
+profile: "work"
 
 # Age encryption tool configuration
 age:
