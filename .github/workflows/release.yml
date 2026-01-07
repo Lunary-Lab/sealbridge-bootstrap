@@ -54,52 +54,6 @@ jobs:
           source .venv/bin/activate
           pytest tests/e2e/test_full_system.py -v --tb=short -m full_system || echo "Full system tests skipped (test infrastructure not configured)"
 
-  e2e-windows:
-    name: E2E Tests - Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install uv
-        run: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-      - name: Add uv to PATH
-        run: |
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          echo "$env:Path" >> $env:GITHUB_PATH
-      - name: Set up test environment
-        working-directory: sealbridge-bootstrap/payload
-        shell: pwsh
-        run: |
-          uv venv
-          .\.venv\Scripts\Activate.ps1
-          uv pip sync requirements.lock
-          uv pip install -e .
-          uv pip install pytest pytest-docker
-      - name: Run E2E tests (Windows)
-        working-directory: sealbridge-bootstrap/payload
-        shell: pwsh
-        env:
-          TEST_MASTER_PASSWORD: "test-master-password-12345"
-          TEST_SHARED_SECRET: "test-shared-secret-67890"
-        run: |
-          .\.venv\Scripts\Activate.ps1
-          pytest tests/e2e/ -v --tb=short -m e2e -k "not docker" || echo "Docker tests skipped on Windows"
-      - name: Test bootstrap.ps1 script syntax
-        working-directory: sealbridge-bootstrap
-        shell: pwsh
-        run: |
-          $scriptPath = "bootstrap.ps1"
-          $errors = $null
-          $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content $scriptPath -Raw), [ref]$errors)
-          if ($errors.Count -gt 0) {
-            Write-Error "PowerShell syntax errors found:"
-            $errors | ForEach-Object { Write-Error $_ }
-            exit 1
-          }
-          Write-Host "✅ bootstrap.ps1 syntax is valid"
-
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest

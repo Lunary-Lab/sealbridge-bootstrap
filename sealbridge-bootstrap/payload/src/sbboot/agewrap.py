@@ -41,8 +41,9 @@ def _get_system_arch() -> str:
         if machine == "arm64":
             return "darwin-arm64"
         if machine in ["x86_64", "amd64"]:
-            # Note: darwin-amd64 may not be available in all age releases
-            # v1.3.1 only has darwin-arm64, but we support it for older versions
+            # Note: Some age releases (e.g., v1.3.1) only provide darwin-arm64
+            # Intel Macs can use Rosetta 2 to run arm64 binaries, or we can check
+            # if darwin-amd64 is available in the release
             return "darwin-amd64"
 
     raise AgeBinaryError(
