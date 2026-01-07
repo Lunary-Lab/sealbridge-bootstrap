@@ -1,1 +1,0 @@
-# sealbridge-bootstrap
