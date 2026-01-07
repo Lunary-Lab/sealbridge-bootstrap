@@ -1,4 +1,4 @@
 # src/sbboot/__init__.py
 """SealBridge Bootstrap: Two-gate workstation bootstrap utility."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
