@@ -334,17 +334,47 @@ main() {
     set -e
     if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
         _warn "Cryptography import check failed, attempting to reinstall..."
-        # Reinstall cryptography using native-tls
-        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography>=42.0.0' --native-tls || _err "Failed to reinstall cryptography"
-        # Verify again
+        # Try latest version first (most secure and likely to work)
+        _info "Trying latest cryptography version..."
         set +e
-        CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
-        CRYPTO_CHECK_EXIT=$?
+        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography' --native-tls 2>&1
+        LATEST_INSTALL_EXIT=$?
         set -e
+        
+        if [ $LATEST_INSTALL_EXIT -eq 0 ]; then
+            # Verify latest version works
+            set +e
+            CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
+            CRYPTO_CHECK_EXIT=$?
+            set -e
+            if [ $CRYPTO_CHECK_EXIT -eq 0 ]; then
+                _info "Cryptography latest version installed and verified successfully"
+            fi
+        fi
+        
+        # If latest failed, try minimum required version
+        if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
+            _warn "Latest version failed, trying minimum required version (>=42.0.0)..."
+            set +e
+            "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography>=42.0.0' --native-tls 2>&1
+            MIN_INSTALL_EXIT=$?
+            set -e
+            
+            if [ $MIN_INSTALL_EXIT -eq 0 ]; then
+                # Verify minimum version works
+                set +e
+                CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
+                CRYPTO_CHECK_EXIT=$?
+                set -e
+            fi
+        fi
+        
+        # Final check - if still failing, show debug info
         if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
             _warn "Cryptography debug info:"
-            ".venv/bin/python" -c "import cryptography.hazmat.primitives.ciphers.aead as aead; print(dir(aead))" 2>&1 || true
-            _err "Cryptography installation is broken. Please check your Python environment and system dependencies. Error: $CRYPTO_CHECK"
+            ".venv/bin/python" -c "import cryptography; print(f'Version: {cryptography.__version__}')" 2>&1 || true
+            ".venv/bin/python" -c "import cryptography.hazmat.primitives.ciphers.aead as aead; print(f'Available: {[x for x in dir(aead) if not x.startswith(\"_\")]}')" 2>&1 || true
+            _err "Cryptography installation is broken. XChaCha20Poly1305 not available. Error: $CRYPTO_CHECK"
         fi
     fi
 
