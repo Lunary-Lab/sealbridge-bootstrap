@@ -103,12 +103,13 @@ jobs:
           source .venv/bin/activate
           uv pip sync requirements.lock
           uv pip install -e .
+          uv pip install hatchling
       
       - name: Build bootstrap payload
         working-directory: sealbridge-bootstrap/payload
         run: |
           source .venv/bin/activate
-          uv run hatch build
+          python -m hatchling build
       
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
