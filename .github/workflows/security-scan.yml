@@ -20,15 +20,15 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for scanning
       
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin
+      
       - name: Run Gitleaks on repository
-        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          no-git: false
-          verbose: true
-          redact: true
-          exit-code: 1
+        run: |
+          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1
       
       - name: Install GitHub CLI
         if: github.event_name == 'release'

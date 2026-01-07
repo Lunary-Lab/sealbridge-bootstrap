@@ -16,15 +16,15 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin
+      
       - name: Run Gitleaks on repository
-        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          no-git: false
-          verbose: true
-          redact: true
-          exit-code: 1
+        run: |
+          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1
   
   # E2E tests must pass before release
   e2e-linux-check:
@@ -55,7 +55,7 @@ jobs:
           source .venv/bin/activate
           uv pip sync requirements.lock
           uv pip install -e .
-          uv pip install pytest pytest-docker
+          uv pip install pytest docker pytest-docker
       
       - name: Run E2E tests (isolated)
         working-directory: sealbridge-bootstrap/payload
