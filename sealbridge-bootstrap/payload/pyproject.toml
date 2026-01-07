@@ -29,7 +29,7 @@ dependencies = [
     "python-json-logger>=2.0.0,<3.0.0",
     "keyring>=24.0.0,<25.0.0",
     "argon2-cffi>=23.1.0",
-    "cryptography>=42.0.0",
+    "cryptography==43.0.3",
 ]
 
 [project.urls]
