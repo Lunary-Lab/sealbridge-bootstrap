@@ -341,8 +341,11 @@ main() {
     _info "Creating Python virtual environment with Python $PYTHON_SPEC..."
     
     # Try to create venv - if it fails with SSL error, try to use Python path directly
+    # Temporarily disable exit on error to capture the error
+    set +e
     VENV_OUTPUT="$("$UV_CMD" venv --python "$PYTHON_SPEC" 2>&1)"
     VENV_EXIT=$?
+    set -e
     
     if [ $VENV_EXIT -ne 0 ]; then
         # Check if it's an SSL certificate error
@@ -382,10 +385,10 @@ main() {
     fi
 
     _info "Installing dependencies..."
-    uv pip sync requirements.lock
+    "$UV_CMD" pip sync requirements.lock || _err "Failed to install dependencies"
 
     _info "Installing sbboot package..."
-    uv pip install -e .
+    "$UV_CMD" pip install -e . || _err "Failed to install sbboot package"
 
     # Ensure XDG directories exist
     XDG_DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
