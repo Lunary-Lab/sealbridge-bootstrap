@@ -189,29 +189,35 @@ main() {
     # Install Python 3.11 via uv (required - cannot use system Python)
     _info "Installing Python 3.11 via uv..."
     
-    # Set SSL certificate bundle if on macOS (fixes certificate issues)
+    # Configure SSL certificates for uv (rustls needs system certs on macOS)
     if [ "$(uname)" = "Darwin" ]; then
-        # macOS may need explicit certificate path
-        export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}"
-        if [ ! -f "$SSL_CERT_FILE" ]; then
-            # Try alternative locations
-            for cert_path in \
-                "/usr/local/etc/openssl/cert.pem" \
-                "/opt/homebrew/etc/openssl/cert.pem" \
-                "/System/Library/OpenSSL/certs/cert.pem"; do
-                if [ -f "$cert_path" ]; then
-                    export SSL_CERT_FILE="$cert_path"
-                    break
-                fi
-            done
+        # uv uses rustls which needs system certificates
+        # Try to find and set certificate bundle
+        for cert_path in \
+            "/etc/ssl/cert.pem" \
+            "/usr/local/etc/openssl/cert.pem" \
+            "/opt/homebrew/etc/openssl/cert.pem" \
+            "/System/Library/OpenSSL/certs/cert.pem" \
+            "$(security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain 2>/dev/null | head -1)"; do
+            if [ -f "$cert_path" ] || [ -n "$cert_path" ]; then
+                export SSL_CERT_FILE="$cert_path"
+                export REQUESTS_CA_BUNDLE="$cert_path"
+                export CURL_CA_BUNDLE="$cert_path"
+                break
+            fi
+        done
+        
+        # uv may also need RUSTLS_ROOT_CERT_STORE environment variable
+        # Try to use system keychain certificates
+        if security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain >/dev/null 2>&1; then
+            export RUSTLS_ROOT_CERT_STORE="system"
         fi
-        # Also set for curl/openssl
-        export CURL_CA_BUNDLE="$SSL_CERT_FILE"
     fi
     
-    # Install Python 3.11 via uv
+    # Install Python 3.11 via uv with retries
+    _info "Downloading Python 3.11 (this may take a moment)..."
     if ! uv python install 3.11 2>&1; then
-        _err "Failed to install Python 3.11 via uv. This is required. Please check your network connection and SSL certificates."
+        _err "Failed to install Python 3.11 via uv. This is required. Error may be due to SSL certificates or network issues."
     fi
     
     _info "Creating Python virtual environment with Python 3.11..."
