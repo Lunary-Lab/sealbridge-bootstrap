@@ -1,42 +1,123 @@
 [
- {
-  "Description": "Generic API Key",
-  "StartLine": 9,
-  "EndLine": 9,
-  "StartColumn": 6,
-  "EndColumn": 106,
-  "Match": "KEY_PLAINTEXT = \"AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\"",
-  "Secret": "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890",
-  "File": "sealbridge-bootstrap/payload/tests/e2e/create_encrypted_key.py",
-  "SymlinkFile": "",
-  "Commit": "",
-  "Entropy": 4.0827622,
-  "Author": "",
-  "Email": "",
-  "Date": "",
-  "Message": "",
-  "Tags": [],
-  "RuleID": "generic-api-key",
-  "Fingerprint": "dad196887035842ebcebeaacba48cd28773626a3:sealbridge-bootstrap/payload/tests/e2e/create_encrypted_key.py:generic-api-key:9"
- },
- {
-  "Description": "Generic API Key",
-  "StartLine": 41,
-  "EndLine": 41,
-  "StartColumn": 6,
-  "EndColumn": 104,
-  "Match": "KEY_PLAINTEXT=\"AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890\"",
-  "Secret": "AGE-SECRET-KEY-1TESTKEY123456789012345678901234567890123456789012345678901234567890",
-  "File": "sealbridge-bootstrap/payload/tests/e2e/setup_e2e_env.sh",
-  "SymlinkFile": "",
-  "Commit": "",
-  "Entropy": 4.0827622,
-  "Author": "",
-  "Email": "",
-  "Date": "",
-  "Message": "",
-  "Tags": [],
-  "RuleID": "generic-api-key",
-  "Fingerprint": "dad196887035842ebcebeaacba48cd28773626a3:sealbridge-bootstrap/payload/tests/e2e/setup_e2e_env.sh:generic-api-key:41"
- }
+  {
+    "Description": "GitHub Fine-Grained Personal Access Token",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "github-fine-grained-pat",
+    "Fingerprint": "sealbridge-bootstrap/.env:github-fine-grained-pat:14"
+  },
+  {
+    "Description": "GitHub Fine-Grained Personal Access Token",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "github-fine-grained-pat",
+    "Fingerprint": "sealbridge-bootstrap/.env:github-fine-grained-pat:53"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:4"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:8"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:9"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:17"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:18"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:32"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:36"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:37"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:43"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:47"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:48"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:58"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:67"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:82"
+  },
+  {
+    "Description": "Generic API Key",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "generic-api-key",
+    "Fingerprint": "sealbridge-bootstrap/.env:generic-api-key:111"
+  },
+  {
+    "Description": "GitHub Personal Access Token",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "github-pat",
+    "Fingerprint": "sealbridge-bootstrap/.env:github-pat:15"
+  },
+  {
+    "Description": "GitHub OAuth Access Token",
+    "File": "sealbridge-bootstrap/.env",
+    "RuleID": "github-oauth",
+    "Fingerprint": "sealbridge-bootstrap/.env:github-oauth:2"
+  },
+  {
+    "Description": "Private Key",
+    "File": "sealbridge-bootstrap/payload/.venv/lib/python3.12/site-packages/cryptography/hazmat/primitives/serialization/ssh.py",
+    "RuleID": "private-key",
+    "Fingerprint": "sealbridge-bootstrap/payload/.venv/lib/python3.12/site-packages/cryptography/hazmat/primitives/serialization/ssh.py:private-key:78"
+  }
 ]
+]133;D;0]133;D]133;P;k=i[K[J[0m[?25h[?1l]0;Command Complete]133;A
