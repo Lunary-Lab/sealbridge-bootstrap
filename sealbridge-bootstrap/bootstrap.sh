@@ -369,10 +369,10 @@ main() {
     
     _info "Creating Python virtual environment with Python $PYTHON_SPEC..."
     
-    # Try to create venv - if it fails with SSL error, try to use Python path directly
+    # Try to create venv - use --native-tls to work around SSL certificate issues with corporate proxies
     # Temporarily disable exit on error to capture the error
     set +e
-    VENV_OUTPUT="$("$UV_CMD" venv --python "$PYTHON_SPEC" 2>&1)"
+    VENV_OUTPUT="$("$UV_CMD" venv --python "$PYTHON_SPEC" --native-tls 2>&1)"
     VENV_EXIT=$?
     set -e
     
@@ -410,7 +410,7 @@ main() {
             
             if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
                 _info "Using Python directly from cache: $PYTHON_PATH"
-                "$UV_CMD" venv --python "$PYTHON_PATH" || _err "Failed to create virtual environment with Python from cache"
+                "$UV_CMD" venv --python "$PYTHON_PATH" --native-tls || _err "Failed to create virtual environment with Python from cache"
             else
                 _err "Failed to create virtual environment. Python 3.11 is installed but cannot be accessed due to SSL certificate issues."
             fi
