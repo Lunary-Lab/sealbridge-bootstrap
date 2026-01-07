@@ -1,0 +1,61 @@
+name: Release Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v0.1.28'
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Set up build environment
+        working-directory: sealbridge-bootstrap/payload
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip sync requirements.lock
+          uv pip install -e .
+          uv pip install build
+      
+      - name: Build bootstrap payload
+        working-directory: sealbridge-bootstrap/payload
+        run: |
+          source .venv/bin/activate
+          python -m build
+      
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sealbridge-bootstrap/payload/dist/*.tar.gz
+            sealbridge-bootstrap/payload/dist/*.whl
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Release ${{ github.event.inputs.tag || github.ref_name }}
+          body: "Automated release of SealBridge Bootstrap payload."
+          draft: false
+          prerelease: false
+
