@@ -334,14 +334,16 @@ main() {
     set -e
     if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
         _warn "Cryptography import check failed, attempting to reinstall..."
-        # Reinstall the specific working version of cryptography using native-tls
-        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography==43.0.3' --native-tls || _err "Failed to reinstall cryptography"
+        # Reinstall cryptography using native-tls
+        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography>=42.0.0' --native-tls || _err "Failed to reinstall cryptography"
         # Verify again
         set +e
         CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
         CRYPTO_CHECK_EXIT=$?
         set -e
         if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
+            _warn "Cryptography debug info:"
+            ".venv/bin/python" -c "import cryptography.hazmat.primitives.ciphers.aead as aead; print(dir(aead))" 2>&1 || true
             _err "Cryptography installation is broken. Please check your Python environment and system dependencies. Error: $CRYPTO_CHECK"
         fi
     fi
