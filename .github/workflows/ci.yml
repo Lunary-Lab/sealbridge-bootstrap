@@ -82,4 +82,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . --baseline-path .gitleaks.baseline --exclude-path .gitleaks.baseline --verbose --redact --exit-code 1
+          gitleaks detect --source . --baseline-path .gitleaks.baseline --verbose --redact --exit-code 1

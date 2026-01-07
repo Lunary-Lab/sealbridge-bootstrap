@@ -1,0 +1,4 @@
+.gitleaks.baseline
+sealbridge-bootstrap/payload/tests/e2e/*.py
+sealbridge-bootstrap/payload/tests/e2e/*.sh
+
