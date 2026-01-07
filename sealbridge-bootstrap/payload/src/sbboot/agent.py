@@ -144,12 +144,32 @@ class SshAgentManager:
         """Adds a private key to the running SSH agent."""
         console.log("Adding decrypted key to SSH agent in memory...")
         try:
-            subprocess.run(
-                ["ssh-add", "-"],
-                input=private_key_bytes,
-                capture_output=True,
-                check=True,
-            )
+            # On macOS, use -K flag (or --apple-use-keychain) to add key to keychain
+            # This ensures keys persist across reboots and are available to all applications
+            if paths.is_macos():
+                # Try --apple-use-keychain first (macOS 12.2+), fall back to -K
+                try:
+                    subprocess.run(
+                        ["ssh-add", "--apple-use-keychain", "-"],
+                        input=private_key_bytes,
+                        capture_output=True,
+                        check=True,
+                    )
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    # Fall back to -K flag for older macOS versions
+                    subprocess.run(
+                        ["ssh-add", "-K", "-"],
+                        input=private_key_bytes,
+                        capture_output=True,
+                        check=True,
+                    )
+            else:
+                subprocess.run(
+                    ["ssh-add", "-"],
+                    input=private_key_bytes,
+                    capture_output=True,
+                    check=True,
+                )
             console.log("Key added successfully to agent.")
         except FileNotFoundError:
             raise SshAgentError("`ssh-add` command not found. Please install OpenSSH.")

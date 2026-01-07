@@ -92,6 +92,12 @@ _add_bin_to_path() {
         zsh)
             if [ -f "$HOME/.zshrc" ]; then
                 PROFILE_FILE="$HOME/.zshrc"
+            else
+                # Create .zshrc if it doesn't exist on macOS (zsh is default shell)
+                if [ "$(uname)" = "Darwin" ]; then
+                    touch "$HOME/.zshrc"
+                    PROFILE_FILE="$HOME/.zshrc"
+                fi
             fi
             ;;
         fish)
@@ -166,6 +172,10 @@ main() {
     if ! command -v "uv" >/dev/null 2>&1; then
         _info "Installing 'uv'..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Add cargo bin to PATH if it exists (uv installer places uv in ~/.cargo/bin)
+        if [ -d "$HOME/.cargo/bin" ]; then
+            export PATH="$HOME/.cargo/bin:$PATH"
+        fi
         # Source cargo env if it exists (uv installer may add uv to PATH directly)
         if [ -f "$HOME/.cargo/env" ]; then
             . "$HOME/.cargo/env"

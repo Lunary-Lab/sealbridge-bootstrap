@@ -141,3 +141,8 @@ def get_otp_gate_cert_path() -> Path | None:
 def is_windows() -> bool:
     """Check if the current operating system is Windows."""
     return sys.platform == "win32"
+
+
+def is_macos() -> bool:
+    """Check if the current operating system is macOS."""
+    return sys.platform == "darwin"

@@ -35,6 +35,10 @@ def _should_use_keyring() -> bool:
 def get_or_set_device_secret() -> str:
     """Retrieves the Shared Secret from the OS Keychain.
     If missing (First Run), prompts the user and saves it securely.
+    
+    Note: On macOS, the first time this function accesses the keychain,
+    macOS will prompt the user for permission. Users should click
+    "Always Allow" to avoid repeated prompts.
     """
     secret = None
     if _should_use_keyring():
@@ -42,6 +46,10 @@ def get_or_set_device_secret() -> str:
             secret = keyring.get_password(APP_NAME, SECRET_KEY_NAME)
         except Exception as e:
             console.print(f"[yellow]Warning: Could not access keyring: {e}[/yellow]")
+            if _is_macos():
+                console.print(
+                    "[yellow]If you denied keychain access, you'll be prompted again next time.[/yellow]"
+                )
 
     if secret:
         console.print(
