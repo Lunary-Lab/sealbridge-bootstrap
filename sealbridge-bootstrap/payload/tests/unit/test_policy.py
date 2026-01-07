@@ -1,11 +1,13 @@
 # tests/unit/test_policy.py
 from pathlib import Path
-import pytest
 from unittest.mock import MagicMock
 
-from sbboot.policy import PolicyManager
-from sbboot.errors import PolicyViolationError
+import pytest
+
 from sbboot import paths
+from sbboot.errors import PolicyViolationError
+from sbboot.policy import PolicyManager
+
 
 @pytest.fixture
 def mock_config() -> MagicMock:
@@ -19,6 +21,7 @@ def mock_config() -> MagicMock:
     mock.resolve_path.side_effect = resolve_path_side_effect
     return mock
 
+
 def test_policy_exclude_workspace(mock_config):
     manager = PolicyManager(mock_config)
     workspace_path = paths.HOME / "workspace" / "some_project"
@@ -26,39 +29,46 @@ def test_policy_exclude_workspace(mock_config):
     with pytest.raises(PolicyViolationError, match="forbidden by an exclude rule"):
         manager.check_write(workspace_path)
 
+
 def test_policy_allow_bootstrap_dirs(mock_config, monkeypatch):
     manager = PolicyManager(mock_config)
 
     data_dir = paths.HOME / ".local" / "share" / "sealbridge"
     cache_dir = paths.HOME / ".cache" / "sealbridge"
 
-    monkeypatch.setattr(paths, 'get_app_data_dir', lambda: data_dir)
-    monkeypatch.setattr(paths, 'get_app_cache_dir', lambda: cache_dir)
-    monkeypatch.setattr(paths, 'get_app_config_dir', lambda: Path())
-    monkeypatch.setattr(paths, 'get_app_state_dir', lambda: Path())
+    monkeypatch.setattr(paths, "get_app_data_dir", lambda: data_dir)
+    monkeypatch.setattr(paths, "get_app_cache_dir", lambda: cache_dir)
+    monkeypatch.setattr(paths, "get_app_config_dir", lambda: Path())
+    monkeypatch.setattr(paths, "get_app_state_dir", lambda: Path())
 
     allowed_path = data_dir / "bin" / "age"
     manager.check_write(allowed_path)
 
     disallowed_path = paths.HOME / "Documents" / "some_file.txt"
-    with pytest.raises(PolicyViolationError, match="restricted to bootstrap-managed directories"):
+    with pytest.raises(
+        PolicyViolationError, match="restricted to bootstrap-managed directories"
+    ):
         manager.check_write(disallowed_path)
+
 
 def test_policy_include_rules(mock_config, monkeypatch):
     mock_config.policy.include = ["${HOME}/Downloads/safe_dir/**"]
     manager = PolicyManager(mock_config)
 
-    monkeypatch.setattr(paths, 'get_app_data_dir', lambda: Path())
-    monkeypatch.setattr(paths, 'get_app_cache_dir', lambda: Path())
-    monkeypatch.setattr(paths, 'get_app_config_dir', lambda: Path())
-    monkeypatch.setattr(paths, 'get_app_state_dir', lambda: Path())
+    monkeypatch.setattr(paths, "get_app_data_dir", lambda: Path())
+    monkeypatch.setattr(paths, "get_app_cache_dir", lambda: Path())
+    monkeypatch.setattr(paths, "get_app_config_dir", lambda: Path())
+    monkeypatch.setattr(paths, "get_app_state_dir", lambda: Path())
 
     allowed_path = paths.HOME / "Downloads" / "safe_dir" / "installer.sh"
     manager.check_write(allowed_path)
 
     disallowed_path = paths.HOME / "Downloads" / "another_dir" / "file.txt"
-    with pytest.raises(PolicyViolationError, match="not covered by any 'include' rules"):
+    with pytest.raises(
+        PolicyViolationError, match="not covered by any 'include' rules"
+    ):
         manager.check_write(disallowed_path)
+
 
 def test_policy_exclude_overrides_include(mock_config):
     mock_config.policy.include = ["${HOME}/workspace/**"]

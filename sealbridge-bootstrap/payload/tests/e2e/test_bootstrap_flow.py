@@ -1,16 +1,17 @@
 # tests/e2e/test_bootstrap_flow.py
 import os
-import pytest
-import docker
-from pathlib import Path
 import tempfile
-import time
+from pathlib import Path
+
+import docker
+import pytest
 
 pytestmark = pytest.mark.e2e
 
 # Test credentials (FAKE - only for e2e testing)
 TEST_MASTER_PASSWORD = "test-master-password-12345"
 TEST_SHARED_SECRET = "test-shared-secret-67890"
+
 
 @pytest.fixture(scope="module")
 def docker_client():
@@ -21,19 +22,27 @@ def docker_client():
     except Exception as e:
         pytest.skip(f"Docker is not available: {e}")
 
+
 @pytest.fixture(scope="module")
 def bootstrap_image(docker_client):
     image_tag = "sealbridge-bootstrap-e2e:latest"
     # Path to repo root (3 levels up from test file)
     repo_root = Path(__file__).parent.parent.parent.parent.parent
-    dockerfile_path = repo_root / "sealbridge-bootstrap" / "payload" / "tests" / "e2e" / "Dockerfile.ubuntu"
+    dockerfile_path = (
+        repo_root
+        / "sealbridge-bootstrap"
+        / "payload"
+        / "tests"
+        / "e2e"
+        / "Dockerfile.ubuntu"
+    )
 
     try:
         image, logs = docker_client.images.build(
             path=str(repo_root),
             dockerfile=str(dockerfile_path.relative_to(repo_root)),
             tag=image_tag,
-            rm=True
+            rm=True,
         )
         yield image_tag
     finally:
@@ -41,6 +50,7 @@ def bootstrap_image(docker_client):
             docker_client.images.remove(image_tag, force=True)
         except docker.errors.ImageNotFound:
             pass
+
 
 def test_bootstrap_flow(docker_client, bootstrap_image):
     """Test the bootstrap flow using 2FA approach."""
@@ -84,12 +94,12 @@ source .venv/bin/activate
 echo -e "{TEST_SHARED_SECRET}\\n{TEST_MASTER_PASSWORD}\\n" | sbboot run --config /tmp/config.yaml
 '
 """
-        
+
         container = docker_client.containers.run(
             bootstrap_image,
             command=["/bin/bash", "-c", test_script],
             detach=True,
-            volumes={config_path: {'bind': '/tmp/config.yaml', 'mode': 'ro'}},
+            volumes={config_path: {"bind": "/tmp/config.yaml", "mode": "ro"}},
             stdin_open=False,
             tty=False,
             network_mode="bridge",
@@ -101,30 +111,40 @@ echo -e "{TEST_SHARED_SECRET}\\n{TEST_MASTER_PASSWORD}\\n" | sbboot run --config
         logs = container.logs().decode("utf-8")
 
         # Check for successful completion indicators
-        assert result["StatusCode"] == 0, f"Bootstrap failed with exit code {result['StatusCode']}. Logs: {logs}"
-        
+        assert result["StatusCode"] == 0, (
+            f"Bootstrap failed with exit code {result['StatusCode']}. Logs: {logs}"
+        )
+
         # Verify no external services accessed
         if "github.com" in logs.lower() and "127.0.0.1" not in logs:
             pytest.fail("External repository accessed")
-        
+
         # Check logs for success indicators
         success_indicators = [
             "Bootstrap complete",
             "bootstrap complete",
             "Age identity written",
-            "Age key file should exist"
+            "Age key file should exist",
         ]
-        assert any(indicator.lower() in logs.lower() for indicator in success_indicators), \
-            f"Bootstrap completion not found in logs: {logs}"
-        
+        assert any(
+            indicator.lower() in logs.lower() for indicator in success_indicators
+        ), f"Bootstrap completion not found in logs: {logs}"
+
         # Verify age key was decrypted and written
-        key_file_check = container.exec_run("test -f /home/tester/.config/chezmoi/key.txt")
-        assert key_file_check.exit_code == 0, "Age key file should exist after bootstrap"
-        
+        key_file_check = container.exec_run(
+            "test -f /home/tester/.config/chezmoi/key.txt"
+        )
+        assert key_file_check.exit_code == 0, (
+            "Age key file should exist after bootstrap"
+        )
+
         # Verify the key file contains the expected age key format
-        key_content = container.exec_run("cat /home/tester/.config/chezmoi/key.txt").output.decode("utf-8")
-        assert "AGE-SECRET-KEY-1" in key_content, f"Decrypted key should contain age key format. Got: {key_content[:50]}"
-        
+        key_content = container.exec_run(
+            "cat /home/tester/.config/chezmoi/key.txt"
+        ).output.decode("utf-8")
+        assert "AGE-SECRET-KEY-1" in key_content, (
+            f"Decrypted key should contain age key format. Got: {key_content[:50]}"
+        )
 
     finally:
         if container:

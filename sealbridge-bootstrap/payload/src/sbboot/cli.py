@@ -3,7 +3,6 @@
 
 import ssl
 import sys
-from typing import Optional
 
 import httpx
 import truststore
@@ -11,7 +10,7 @@ import typer
 from rich.console import Console
 
 from . import __version__, config, errors, paths
-from .errors import ExitCode, SealBridgeError, SealreposError, ConfigError
+from .errors import ConfigError, SealBridgeError, SealreposError
 
 app = typer.Typer(
     name="sbboot",
@@ -32,21 +31,20 @@ def version_callback(value: bool):
 @app.callback()
 def main(
     ctx: typer.Context,
-    config_path: Optional[str] = typer.Option(
+    config_path: str | None = typer.Option(
         None,
         "--config",
         "-c",
         help=f"Path to the bootstrap.yaml configuration file. [default: {paths.get_default_config_path()}]",
         resolve_path=True,
     ),
-    version: Optional[bool] = typer.Option(
+    version: bool | None = typer.Option(
         None, "--version", callback=version_callback, is_eager=True
     ),
 ):
-    """
-    SealBridge Bootstrap CLI.
-    """
+    """SealBridge Bootstrap CLI."""
     from . import logging
+
     try:
         # SAFETY: If --config is explicitly provided, use it and don't fall back to default
         # This prevents accidentally loading real configs in test environments
@@ -56,7 +54,7 @@ def main(
         else:
             # No explicit config - try default but allow missing for some commands
             cfg = config.load_config(config_path, allow_missing=True)
-        
+
         if cfg:
             logging.setup_logging(cfg)
         ctx.obj = cfg
@@ -68,49 +66,59 @@ def main(
 @app.command()
 def run(
     ctx: typer.Context,
-    profile: Optional[str] = typer.Option(
-        None, "--profile", help="Dotfiles profile to apply (e.g., 'work' or 'home'). Overrides config."
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        help="Dotfiles profile to apply (e.g., 'work' or 'home'). Overrides config.",
     ),
 ):
     """Perform the full bootstrap flow."""
+    from rich.prompt import Confirm, Prompt
+
     from . import secrets
-    from rich.prompt import Prompt, Confirm
-    
-    cfg: Optional[config.BootstrapConfig] = ctx.obj
+
+    cfg: config.BootstrapConfig | None = ctx.obj
     if not cfg:
         # No config file found - create one from environment variables and smart defaults
-        console.print("[yellow]No bootstrap.yaml found. Using environment variables and smart defaults.[/yellow]")
-        console.print("You can create ~/.config/sealbridge/bootstrap.yaml to customize settings.\n")
+        console.print(
+            "[yellow]No bootstrap.yaml found. Using environment variables and smart defaults.[/yellow]"
+        )
+        console.print(
+            "You can create ~/.config/sealbridge/bootstrap.yaml to customize settings.\n"
+        )
         cfg = config.create_default_config()
         # Update context with the newly created config so other commands can access it
         ctx.obj = cfg
-    
+
     target_profile = profile or cfg.profile
-    console.print(f"🚀 [bold]Starting SealBridge Bootstrap[/bold] for profile: [bold cyan]{target_profile}[/bold cyan]")
+    console.print(
+        f"🚀 [bold]Starting SealBridge Bootstrap[/bold] for profile: [bold cyan]{target_profile}[/bold cyan]"
+    )
 
     try:
         # Gate 1: Get Device Factor (Shared Secret from Keychain)
         # This replaces the old OTP check.
         from . import security
+
         console.print("\n🔐 [bold]Authenticating Device...[/bold]")
         shared_secret = security.get_or_set_device_secret()
 
         # Gate 2: Get User Factor (Master Password) & Decrypt Age Key
         # This replaces the old 'add-key' command flow which used a passphrase
         # but now uses the derived key from (Master Password + Shared Secret).
-        
+
         # We need the Master Password to decrypt the age key.
         # It's also used for other secrets potentially, but primarily for the root of trust.
         console.print("\n🔐 [bold]Authenticating User...[/bold]")
         master_password = Prompt.ask("Enter Master Password", password=True)
-        
-        # Store Master Password in memory/env for subsequent steps if needed, 
+
+        # Store Master Password in memory/env for subsequent steps if needed,
         # but ideally we just use it to decrypt the age key now.
         # The old code stored MASTER_KEY in secrets store.
         # We might still need MASTER_KEY for legacy encrypted configs in sealbridge-keys?
         # If so, we should treat this input as the MASTER_KEY.
         secrets.SecretStore.set_secret("MASTER_KEY", master_password)
-        
+
         # Decrypt Age Key
         decrypt_age_key(ctx, master_password, shared_secret)
 
@@ -119,7 +127,7 @@ def run(
             # Config has dotfiles_repo, ask user if they want to apply
             should_apply = Confirm.ask(
                 f"\n📁 Apply dotfiles from [bold cyan]{cfg.git.dotfiles_repo}[/bold cyan]?",
-                default=True
+                default=True,
             )
             if should_apply:
                 apply_dotfiles(ctx, profile=target_profile)
@@ -129,10 +137,12 @@ def run(
             # No dotfiles_repo in config, ask user if they want to apply dotfiles
             should_apply = Confirm.ask(
                 "\n📁 No dotfiles repository configured. Would you like to apply dotfiles?",
-                default=False
+                default=False,
             )
             if should_apply:
-                dotfiles_repo = Prompt.ask("Enter dotfiles repository URL (e.g., git@github.com:user/dotfiles.git)")
+                dotfiles_repo = Prompt.ask(
+                    "Enter dotfiles repository URL (e.g., git@github.com:user/dotfiles.git)"
+                )
                 # Temporarily set it in config for this session
                 cfg.git.dotfiles_repo = dotfiles_repo
                 apply_dotfiles(ctx, profile=target_profile)
@@ -141,47 +151,55 @@ def run(
 
         # Install and configure SealBridge Repos
         from . import policy, sealrepos
+
         policy_manager = policy.get_policy_manager(cfg)
-        
+
         try:
             sealrepos.install_sealrepos(cfg, policy_manager)
             sealrepos.configure_sealrepos(cfg, policy_manager)
         except (SealBridgeError, SealreposError) as e:
-            console.print(f"[yellow]Warning:[/yellow] Failed to install/configure SealBridge Repos: {e}")
+            console.print(
+                f"[yellow]Warning:[/yellow] Failed to install/configure SealBridge Repos: {e}"
+            )
             console.print("You can install it manually later if needed.")
 
         # Clone extra repos
         from . import gitwrap
+
         if cfg.git.extra_repos:
             console.print("\n[bold]Cloning extra repositories...[/bold]")
             for repo in cfg.git.extra_repos:
                 dest_dir = paths.HOME / "workspace" / repo.name
                 gitwrap.clone(repo.url, dest_dir, policy_manager, cfg.git.branch)
 
-        console.print("\n🎉 [bold green]Bootstrap complete! Your workstation is ready.[/bold green]")
+        console.print(
+            "\n🎉 [bold green]Bootstrap complete! Your workstation is ready.[/bold green]"
+        )
 
     except typer.Exit:
         console.print("\n[bold red]Bootstrap process was halted.[/bold red]")
         raise
     except errors.SealBridgeError as e:
-        console.print(f"\n[bold red]A critical error occurred during bootstrap:[/bold red]")
+        console.print(
+            "\n[bold red]A critical error occurred during bootstrap:[/bold red]"
+        )
         console.print(e)
         raise typer.Exit(code=e.exit_code)
 
 
 def decrypt_age_key(ctx: typer.Context, master_password: str, shared_secret: str):
     """Decrypt the Age key using 2-factor derived key and add it to the ssh-agent."""
-    from . import agewrap, agent, util, security
-    import subprocess
     from pathlib import Path
 
-    cfg: Optional[config.BootstrapConfig] = ctx.obj
+    from . import agent, agewrap, security
+
+    cfg: config.BootstrapConfig | None = ctx.obj
     if not cfg:
         raise ConfigError("Configuration file is required for SSH key decryption.")
 
     try:
         age_bin = agewrap.get_age_binary(cfg)
-        
+
         # Look for the encrypted key file.
         # We assume it's bundled or in a standard location.
         # Check config first, then fallback to relative path.
@@ -195,29 +213,37 @@ def decrypt_age_key(ctx: typer.Context, master_password: str, shared_secret: str
             if candidate.exists():
                 key_path = candidate
             else:
-                 # Try finding it in the payload source
-                 # This is tricky because we are running installed package
-                 console.print("[yellow]Warning: 'age_key.enc' not found in CWD.[/yellow]")
-                 # Ask user for path? Or fail?
-                 # For now, let's assume it MUST be present.
-                 raise errors.SealBridgeError("age_key.enc not found. Please ensure it is present in the bootstrap payload.")
+                # Try finding it in the payload source
+                # This is tricky because we are running installed package
+                console.print(
+                    "[yellow]Warning: 'age_key.enc' not found in CWD.[/yellow]"
+                )
+                # Ask user for path? Or fail?
+                # For now, let's assume it MUST be present.
+                raise errors.SealBridgeError(
+                    "age_key.enc not found. Please ensure it is present in the bootstrap payload."
+                )
         else:
             key_path = cfg.resolve_path(encrypted_key_path)
 
         if not key_path.exists():
-             raise errors.SealBridgeError(f"Encrypted key file not found at {key_path}")
+            raise errors.SealBridgeError(f"Encrypted key file not found at {key_path}")
 
         console.print(f"🔐 [bold]Decrypting age key from {key_path}...[/bold]")
-        
+
         try:
             encrypted_data = key_path.read_bytes()
-            decrypted_key_bytes = security.decrypt_data(encrypted_data, master_password, shared_secret)
+            decrypted_key_bytes = security.decrypt_data(
+                encrypted_data, master_password, shared_secret
+            )
             # key file usually contains "AGE-SECRET-KEY-..."
             # remove whitespace
-            decrypted_key = decrypted_key_bytes.decode('utf-8').strip()
+            decrypted_key = decrypted_key_bytes.decode("utf-8").strip()
         except Exception as e:
             console.print(f"[bold red]Decryption Failed:[/bold red] {e}")
-            console.print("Possible causes: Wrong Master Password or Wrong Shared Secret.")
+            console.print(
+                "Possible causes: Wrong Master Password or Wrong Shared Secret."
+            )
             raise typer.Exit(code=errors.ExitCode.AGE_BINARY_ERROR)
 
         with agent.SshAgentManager() as agent_manager:
@@ -236,21 +262,23 @@ def decrypt_age_key(ctx: typer.Context, master_password: str, shared_secret: str
             # Let's check `agent.py` to see what `add_key` does.
             # If it calls `ssh-add`, it needs an SSH key.
             # If we are using age native keys, we need to place it in `~/.config/chezmoi/key.txt`.
-            
+
             # Re-reading WARP.md: "Decrypts: `age_key.enc` -> `~/.config/chezmoi/key.txt`."
             # So we should write it to disk, NOT add to ssh-agent (unless it's also an SSH key).
-            
+
             target_key_file = paths.get_xdg_config_home() / "chezmoi" / "key.txt"
             target_key_file.parent.mkdir(parents=True, exist_ok=True)
             target_key_file.write_text(decrypted_key)
             target_key_file.chmod(0o600)
-            console.print(f"✅ [green]Age identity written to {target_key_file}[/green]")
-            
-            # If the user ALSO needs this key for SSH auth (e.g. git clone), 
+            console.print(
+                f"✅ [green]Age identity written to {target_key_file}[/green]"
+            )
+
+            # If the user ALSO needs this key for SSH auth (e.g. git clone),
             # and if it IS an SSH key, we could add it.
             # But "age key" usually implies native age.
             # Let's assume for now we just write to disk for chezmoi.
-            
+
     except errors.SealBridgeError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=e.exit_code)
@@ -259,24 +287,28 @@ def decrypt_age_key(ctx: typer.Context, master_password: str, shared_secret: str
 @app.command("apply-dotfiles")
 def apply_dotfiles(
     ctx: typer.Context,
-    profile: Optional[str] = typer.Option(
-        None, "--profile", help="Dotfiles profile to apply (e.g., 'work' or 'home'). Overrides config."
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        help="Dotfiles profile to apply (e.g., 'work' or 'home'). Overrides config.",
     ),
 ):
     """Run chezmoi to apply the selected dotfiles profile."""
-    from . import chezmoi, agent
+    from . import agent, chezmoi
 
-    cfg: Optional[config.BootstrapConfig] = ctx.obj
+    cfg: config.BootstrapConfig | None = ctx.obj
     if not cfg:
         raise ConfigError("Configuration file is required for applying dotfiles.")
     if not cfg.git.dotfiles_repo:
-        raise ConfigError("No dotfiles repository configured. Set 'git.dotfiles_repo' in bootstrap.yaml or provide it interactively.")
+        raise ConfigError(
+            "No dotfiles repository configured. Set 'git.dotfiles_repo' in bootstrap.yaml or provide it interactively."
+        )
 
     try:
         chezmoi_bin = chezmoi.get_chezmoi_binary(cfg)
 
         with agent.SshAgentManager():
-             chezmoi.apply_dotfiles(cfg, chezmoi_bin, profile)
+            chezmoi.apply_dotfiles(cfg, chezmoi_bin, profile)
 
     except errors.SealBridgeError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
@@ -307,8 +339,7 @@ def paths(ctx: typer.Context):
 @app.command()
 def doctor(ctx: typer.Context):
     """Validate the environment, configuration, and connectivity."""
-    from . import util, agent
-    import httpx
+    from . import agent, util
 
     cfg: config.BootstrapConfig = ctx.obj
 
@@ -341,7 +372,9 @@ def doctor(ctx: typer.Context):
     except errors.SshAgentError as e:
         console.print(f"❌ [red]SSH Agent Check Failed:[/red] {e}")
 
-    console.print(f"\n[bold]Checking connectivity to OTP Gate at {cfg.otp_gate.url}...[/bold]")
+    console.print(
+        f"\n[bold]Checking connectivity to OTP Gate at {cfg.otp_gate.url}...[/bold]"
+    )
     try:
         # Use bundled certificate if available, otherwise use system trust store
         cert_path = paths.get_otp_gate_cert_path()
@@ -351,13 +384,19 @@ def doctor(ctx: typer.Context):
         else:
             # Use truststore for system CA verification
             verify_ssl = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        
+
         with httpx.Client(timeout=5.0, verify=verify_ssl) as client:
-            response = client.get(cfg.otp_gate.url.copy_with(path="/healthz"))  # Use /healthz endpoint
+            response = client.get(
+                cfg.otp_gate.url.copy_with(path="/healthz")
+            )  # Use /healthz endpoint
             if response.status_code == 200:
-                console.print("✅ [green]Successfully connected to the OTP Gate.[/green]")
+                console.print(
+                    "✅ [green]Successfully connected to the OTP Gate.[/green]"
+                )
             else:
-                console.print(f"⚠️ [yellow]Connected to OTP Gate, but got status {response.status_code}.[/yellow]")
+                console.print(
+                    f"⚠️ [yellow]Connected to OTP Gate, but got status {response.status_code}.[/yellow]"
+                )
     except httpx.RequestError as e:
         console.print(f"❌ [red]OTP Gate Connectivity Check Failed:[/red] {e}")
 

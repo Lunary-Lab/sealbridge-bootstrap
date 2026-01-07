@@ -1,5 +1,6 @@
 # tests/unit/test_config.py
 from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -40,17 +41,20 @@ age:
     checksums_url: "invalid-url"
 """
 
+
 @pytest.fixture
 def valid_config_file(tmp_path: Path) -> Path:
     config_path = tmp_path / "bootstrap.yaml"
     config_path.write_text(VALID_CONFIG_YAML)
     return config_path
 
+
 @pytest.fixture
 def invalid_config_file(tmp_path: Path) -> Path:
     config_path = tmp_path / "bootstrap.yaml"
     config_path.write_text(INVALID_CONFIG_YAML)
     return config_path
+
 
 def test_load_config_success(valid_config_file: Path):
     cfg = config.load_config(valid_config_file)
@@ -61,15 +65,18 @@ def test_load_config_success(valid_config_file: Path):
     assert cfg.chezmoi.assets["linux_amd64"].sha256 == "aabbcc"
     assert "${HOME}/workspace/**" in cfg.policy.exclude
 
+
 def test_load_config_not_found():
     with pytest.raises(ConfigError, match="Configuration file not found"):
         config.load_config(Path("/non/existent/path/bootstrap.yaml"))
+
 
 def test_load_config_invalid_yaml(tmp_path: Path):
     config_path = tmp_path / "invalid.yaml"
     config_path.write_text("key: value: another")
     with pytest.raises(ConfigError, match="Failed to parse"):
         config.load_config(config_path)
+
 
 def test_load_config_validation_error(invalid_config_file: Path):
     with pytest.raises(ConfigError, match="Configuration validation failed"):
@@ -78,6 +85,7 @@ def test_load_config_validation_error(invalid_config_file: Path):
         except ConfigError as e:
             assert isinstance(e.__cause__, ValidationError)
             raise e
+
 
 def test_resolve_path(valid_config_file: Path):
     cfg = config.load_config(valid_config_file)

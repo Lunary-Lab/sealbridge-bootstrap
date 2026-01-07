@@ -1,12 +1,13 @@
 # tests/unit/test_chezmoi.py
+import types
 from pathlib import Path
+
 import pytest
 from pytest_mock import MockerFixture
-import types
 
 from sbboot import chezmoi
 from sbboot.config import BootstrapConfig
-from sbboot.errors import ChezmoiError
+
 
 @pytest.fixture
 def mock_bootstrap_config(mocker: MockerFixture) -> BootstrapConfig:
@@ -25,7 +26,10 @@ def mock_bootstrap_config(mocker: MockerFixture) -> BootstrapConfig:
 
     return mock_config
 
-def test_get_chezmoi_binary_found(mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig):
+
+def test_get_chezmoi_binary_found(
+    mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig
+):
     mocker.patch("sbboot.paths.get_bin_dir", return_value=Path("/fake/bin"))
     mocker.patch("sbboot.paths.is_windows", return_value=False)
 
@@ -34,7 +38,10 @@ def test_get_chezmoi_binary_found(mocker: MockerFixture, mock_bootstrap_config: 
     binary_path = chezmoi.get_chezmoi_binary(mock_bootstrap_config)
     assert binary_path == Path("/fake/bin/chezmoi")
 
-def test_get_chezmoi_binary_download_and_verify(mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig, tmp_path: Path):
+
+def test_get_chezmoi_binary_download_and_verify(
+    mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig, tmp_path: Path
+):
     mocker.patch("sbboot.paths.get_bin_dir", return_value=tmp_path)
     mocker.patch("sbboot.paths.is_windows", return_value=False)
     mocker.patch("sbboot.chezmoi._get_system_arch", return_value="linux_amd64")
@@ -52,6 +59,7 @@ def test_get_chezmoi_binary_download_and_verify(mocker: MockerFixture, mock_boot
 
     assert binary_path == tmp_path / "chezmoi"
 
+
 def test_apply_dotfiles(mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig):
     mock_popen = mocker.patch("subprocess.Popen")
     mock_proc = mocker.Mock()
@@ -59,7 +67,9 @@ def test_apply_dotfiles(mocker: MockerFixture, mock_bootstrap_config: BootstrapC
     mock_proc.stdout.readline.return_value = ""
     mock_popen.return_value = mock_proc
 
-    chezmoi.apply_dotfiles(mock_bootstrap_config, Path("/fake/bin/chezmoi"), profile=None)
+    chezmoi.apply_dotfiles(
+        mock_bootstrap_config, Path("/fake/bin/chezmoi"), profile=None
+    )
 
     called_args, called_kwargs = mock_popen.call_args
     command = called_args[0]
@@ -74,14 +84,19 @@ def test_apply_dotfiles(mocker: MockerFixture, mock_bootstrap_config: BootstrapC
     assert env.get("DOTFILES_PROFILE") == "work"
     assert env.get("CONSENT_INSTALL") == "1"
 
-def test_apply_dotfiles_with_profile_override(mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig):
+
+def test_apply_dotfiles_with_profile_override(
+    mocker: MockerFixture, mock_bootstrap_config: BootstrapConfig
+):
     mock_popen = mocker.patch("subprocess.Popen")
     mock_proc = mocker.Mock()
     mock_proc.wait.return_value = 0
     mock_proc.stdout.readline.return_value = ""
     mock_popen.return_value = mock_proc
 
-    chezmoi.apply_dotfiles(mock_bootstrap_config, Path("/fake/bin/chezmoi"), profile="home")
+    chezmoi.apply_dotfiles(
+        mock_bootstrap_config, Path("/fake/bin/chezmoi"), profile="home"
+    )
 
     env = mock_popen.call_args.kwargs.get("env", {})
     assert env.get("DOTFILES_PROFILE") == "home"

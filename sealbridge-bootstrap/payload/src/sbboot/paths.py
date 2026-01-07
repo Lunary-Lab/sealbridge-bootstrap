@@ -10,11 +10,11 @@ from .errors import EnvironmentError
 
 
 def _get_home_path() -> Path:
-    """
-    Get the user's home directory.
+    """Get the user's home directory.
 
     Raises:
         EnvironmentError: If the HOME environment variable is not set.
+
     """
     home = os.environ.get("HOME")
     if not home:
@@ -28,7 +28,9 @@ def _get_home_path() -> Path:
 
     path = Path(home).resolve()
     if not path.is_dir():
-        raise EnvironmentError(f"Home directory '{path}' does not exist or is not a directory.")
+        raise EnvironmentError(
+            f"Home directory '{path}' does not exist or is not a directory."
+        )
 
     return path
 
@@ -38,8 +40,7 @@ HOME: Path = _get_home_path()
 
 @lru_cache(maxsize=1)
 def get_xdg_data_home() -> Path:
-    """
-    Returns the path to the XDG Data Home directory.
+    """Returns the path to the XDG Data Home directory.
 
     Defaults to ~/.local/share if XDG_DATA_HOME is not set.
     """
@@ -50,8 +51,7 @@ def get_xdg_data_home() -> Path:
 
 @lru_cache(maxsize=1)
 def get_xdg_config_home() -> Path:
-    """
-    Returns the path to the XDG Config Home directory.
+    """Returns the path to the XDG Config Home directory.
 
     Defaults to ~/.config if XDG_CONFIG_HOME is not set.
     """
@@ -62,8 +62,7 @@ def get_xdg_config_home() -> Path:
 
 @lru_cache(maxsize=1)
 def get_xdg_state_home() -> Path:
-    """
-    Returns the path to the XDG State Home directory.
+    """Returns the path to the XDG State Home directory.
 
     Defaults to ~/.local/state if XDG_STATE_HOME is not set.
     """
@@ -74,8 +73,7 @@ def get_xdg_state_home() -> Path:
 
 @lru_cache(maxsize=1)
 def get_xdg_cache_home() -> Path:
-    """
-    Returns the path to the XDG Cache Home directory.
+    """Returns the path to the XDG Cache Home directory.
 
     Defaults to ~/.cache if XDG_CACHE_HOME is not set.
     """

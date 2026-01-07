@@ -9,9 +9,7 @@ from .errors import PolicyViolationError
 
 
 class PolicyManager:
-    """
-    Enforces the filesystem access policy defined in the configuration.
-    """
+    """Enforces the filesystem access policy defined in the configuration."""
 
     def __init__(self, config: BootstrapConfig):
         self._config = config
@@ -42,9 +40,7 @@ class PolicyManager:
         return False
 
     def _is_path_within_bootstrap_dirs(self, path: Path) -> bool:
-        """
-        Check if a path is within one of the app's managed XDG directories.
-        """
+        """Check if a path is within one of the app's managed XDG directories."""
         from . import paths
 
         abs_path = path.resolve()
@@ -54,12 +50,13 @@ class PolicyManager:
             paths.get_app_state_dir(),
             paths.get_app_cache_dir(),
         ]
-        return any(abs_path.is_relative_to(managed_dir.resolve()) for managed_dir in managed_dirs)
+        return any(
+            abs_path.is_relative_to(managed_dir.resolve())
+            for managed_dir in managed_dirs
+        )
 
     def check_write(self, path: Path) -> None:
-        """
-        Verifies that a write to the given path is allowed by the policy.
-        """
+        """Verifies that a write to the given path is allowed by the policy."""
         if self._is_path_excluded(path):
             raise PolicyViolationError(
                 f"Write to '{path}' is forbidden by an exclude rule in the policy."
@@ -72,7 +69,7 @@ class PolicyManager:
             return
 
         if self._resolved_include_globs:
-             raise PolicyViolationError(
+            raise PolicyViolationError(
                 f"Write to '{path}' is forbidden. It is not covered by any "
                 f"'include' rules in the policy and is outside standard "
                 f"bootstrap directories."
@@ -83,7 +80,9 @@ class PolicyManager:
                 f"rules, so writes are restricted to bootstrap-managed directories."
             )
 
+
 _policy_manager = None
+
 
 def get_policy_manager(config: BootstrapConfig) -> PolicyManager:
     """Returns a singleton instance of the PolicyManager."""

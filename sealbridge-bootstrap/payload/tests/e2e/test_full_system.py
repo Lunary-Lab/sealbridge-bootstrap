@@ -1,11 +1,12 @@
 # tests/e2e/test_full_system.py
 """Full system integration test."""
+
 import os
-import pytest
-import docker
-from pathlib import Path
 import tempfile
-import time
+from pathlib import Path
+
+import docker
+import pytest
 
 pytestmark = pytest.mark.e2e
 pytestmark = pytest.mark.full_system  # Separate marker for full system tests
@@ -19,12 +20,13 @@ TEST_GOOGLE_CLIENT_ID = os.getenv("E2E_GOOGLE_CLIENT_ID")
 TEST_GOOGLE_CLIENT_SECRET = os.getenv("E2E_GOOGLE_CLIENT_SECRET")
 TEST_GOOGLE_REFRESH_TOKEN = os.getenv("E2E_GOOGLE_REFRESH_TOKEN")
 
+
 # Skip if test infrastructure not available
 def requires_test_infra(func):
     """Skip test if test infrastructure not available."""
     return pytest.mark.skipif(
         not all([TEST_GITHUB_TOKEN, TEST_DOTFILES_REPO]),
-        reason="Test infrastructure not configured (E2E_GITHUB_TOKEN, E2E_DOTFILES_REPO required)"
+        reason="Test infrastructure not configured (E2E_GITHUB_TOKEN, E2E_DOTFILES_REPO required)",
     )(func)
 
 
@@ -44,14 +46,21 @@ def bootstrap_image(docker_client):
     image_tag = "sealbridge-bootstrap-full-system:latest"
     # Path to repo root (3 levels up from test file)
     repo_root = Path(__file__).parent.parent.parent.parent.parent
-    dockerfile_path = repo_root / "sealbridge-bootstrap" / "payload" / "tests" / "e2e" / "Dockerfile.ubuntu"
+    dockerfile_path = (
+        repo_root
+        / "sealbridge-bootstrap"
+        / "payload"
+        / "tests"
+        / "e2e"
+        / "Dockerfile.ubuntu"
+    )
 
     try:
         image, logs = docker_client.images.build(
             path=str(repo_root),
             dockerfile=str(dockerfile_path.relative_to(repo_root)),
             tag=image_tag,
-            rm=True
+            rm=True,
         )
         yield image_tag
     finally:
@@ -67,7 +76,7 @@ def test_full_system_bootstrap(docker_client, bootstrap_image):
     container = None
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
         config_path = f.name
-        
+
         # Build config with test infrastructure
         config = {
             "version": 1,
@@ -75,26 +84,26 @@ def test_full_system_bootstrap(docker_client, bootstrap_image):
             "age": {
                 "binary": {
                     "version": "v1.3.1",
-                    "checksums_url": "https://github.com/FiloSottile/age/releases/download/v1.3.1/sha256sums.txt"
+                    "checksums_url": "https://github.com/FiloSottile/age/releases/download/v1.3.1/sha256sums.txt",
                 },
-                "encrypted_key_path": "/tmp/age_key.enc"
+                "encrypted_key_path": "/tmp/age_key.enc",
             },
             "git": {
                 "dotfiles_repo": TEST_DOTFILES_REPO,
                 "branch": "main",
-                "extra_repos": []
+                "extra_repos": [],
             },
             "chezmoi": {
                 "version": "v2.48.1",
                 "assets": {
                     "linux_amd64": {
                         "url": "https://github.com/twpayne/chezmoi/releases/download/v2.48.1/chezmoi_2.48.1_linux_amd64.tar.gz",
-                        "sha256": "ab61698359b203701cabc08e062efdca595954b7e24c59547c979c377eb5a4da"
+                        "sha256": "ab61698359b203701cabc08e062efdca595954b7e24c59547c979c377eb5a4da",
                     }
-                }
-            }
+                },
+            },
         }
-        
+
         # Add Google Drive config if credentials available
         if TEST_GOOGLE_CLIENT_ID and TEST_GOOGLE_CLIENT_SECRET:
             config["google_drive"] = {
@@ -102,10 +111,11 @@ def test_full_system_bootstrap(docker_client, bootstrap_image):
                 "sync_mode": "bidirectional",
                 "sync_path": "${HOME}/workspace/gdrive-test",
                 "remote_name": "gdrive-test",
-                "token_file": "${HOME}/.config/sealbridge/google-drive-test/token.json"
+                "token_file": "${HOME}/.config/sealbridge/google-drive-test/token.json",
             }
-        
+
         import yaml
+
         f.write(yaml.dump(config))
         f.flush()
 
@@ -153,12 +163,12 @@ source .venv/bin/activate
 echo -e "{TEST_SHARED_SECRET}\\n{TEST_MASTER_PASSWORD}\\n" | sbboot run --config /tmp/config.yaml
 '
 """
-        
+
         container = docker_client.containers.run(
             bootstrap_image,
             command=["/bin/bash", "-c", test_script],
             detach=True,
-            volumes={config_path: {'bind': '/tmp/config.yaml', 'mode': 'ro'}},
+            volumes={config_path: {"bind": "/tmp/config.yaml", "mode": "ro"}},
             stdin_open=False,
             tty=False,
             network_mode="bridge",
@@ -172,26 +182,38 @@ echo -e "{TEST_SHARED_SECRET}\\n{TEST_MASTER_PASSWORD}\\n" | sbboot run --config
 
         # Verify bootstrap completed
         assert result["StatusCode"] == 0, f"Bootstrap failed. Logs: {logs}"
-        
+
         # Verify dotfiles were applied
-        dotfiles_check = container.exec_run("test -d /home/tester/.local/share/chezmoi || echo 'DOTFILES_MISSING'")
-        assert "DOTFILES_MISSING" not in dotfiles_check.output.decode("utf-8"), "Dotfiles should be cloned"
-        
+        dotfiles_check = container.exec_run(
+            "test -d /home/tester/.local/share/chezmoi || echo 'DOTFILES_MISSING'"
+        )
+        assert "DOTFILES_MISSING" not in dotfiles_check.output.decode("utf-8"), (
+            "Dotfiles should be cloned"
+        )
+
         # Verify age key was decrypted
-        key_file_check = container.exec_run("test -f /home/tester/.config/chezmoi/key.txt")
+        key_file_check = container.exec_run(
+            "test -f /home/tester/.config/chezmoi/key.txt"
+        )
         assert key_file_check.exit_code == 0, "Age key file should exist"
-        
+
         # Verify extra repos were cloned (if configured)
         if config["git"].get("extra_repos"):
-            repo_check = container.exec_run("test -d /home/tester/workspace/test-repo-1 || echo 'REPO_MISSING'")
-            assert "REPO_MISSING" not in repo_check.output.decode("utf-8"), "Extra repos should be cloned"
-        
+            repo_check = container.exec_run(
+                "test -d /home/tester/workspace/test-repo-1 || echo 'REPO_MISSING'"
+            )
+            assert "REPO_MISSING" not in repo_check.output.decode("utf-8"), (
+                "Extra repos should be cloned"
+            )
+
         # Verify Google Drive sync was set up (if configured)
         if TEST_GOOGLE_CLIENT_ID:
-            gdrive_check = container.exec_run("test -d /home/tester/workspace/gdrive-test || echo 'GDRIVE_MISSING'")
+            gdrive_check = container.exec_run(
+                "test -d /home/tester/workspace/gdrive-test || echo 'GDRIVE_MISSING'"
+            )
             # Google Drive setup might fail in container, so this is optional
             # assert "GDRIVE_MISSING" not in gdrive_check.output.decode("utf-8"), "Google Drive should be set up"
-        
+
         print("✅ Full system bootstrap test passed")
 
     finally:
@@ -205,4 +227,3 @@ echo -e "{TEST_SHARED_SECRET}\\n{TEST_MASTER_PASSWORD}\\n" | sbboot run --config
                 pass
             container.remove(force=True)
         os.unlink(config_path)
-

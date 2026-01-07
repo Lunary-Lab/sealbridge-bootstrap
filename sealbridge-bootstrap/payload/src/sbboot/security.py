@@ -1,21 +1,14 @@
-"""
-Cryptographic primitives and security logic for SealBridge.
+"""Cryptographic primitives and security logic for SealBridge.
 Handles Keyring access, Argon2id key derivation, and XChaCha20-Poly1305 encryption/decryption.
 """
 
 import os
-import sys
-import getpass
 import platform
-import base64
-from typing import Optional, Tuple
-from pathlib import Path
 
 # External dependencies (validated in pyproject.toml)
 import keyring
-from argon2.low_level import hash_secret_raw, Type
+from argon2.low_level import Type, hash_secret_raw
 from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305
-
 from rich.console import Console
 from rich.prompt import Prompt
 
@@ -24,20 +17,23 @@ console = Console(stderr=True)
 APP_NAME = "SealBridge"
 SECRET_KEY_NAME = "DeviceSecret"
 
+
 def _is_macos() -> bool:
     return platform.system() == "Darwin"
 
+
 def _is_windows() -> bool:
     return platform.system() == "Windows"
+
 
 def _should_use_keyring() -> bool:
     """Check if keyring is supported on this platform."""
     # We support macOS (Keychain) and Windows (Credential Manager)
     return _is_macos() or _is_windows()
 
+
 def get_or_set_device_secret() -> str:
-    """
-    Retrieves the Shared Secret from the OS Keychain.
+    """Retrieves the Shared Secret from the OS Keychain.
     If missing (First Run), prompts the user and saves it securely.
     """
     secret = None
@@ -48,13 +44,17 @@ def get_or_set_device_secret() -> str:
             console.print(f"[yellow]Warning: Could not access keyring: {e}[/yellow]")
 
     if secret:
-        console.print(f"[green]✓[/green] Device authorized (Secret loaded from {platform.system()} Keychain)")
+        console.print(
+            f"[green]✓[/green] Device authorized (Secret loaded from {platform.system()} Keychain)"
+        )
         return secret
 
     # Not found - First Run or New Device
     console.print("\n[bold yellow]Device Secret not found in Keychain.[/bold yellow]")
     console.print("This appears to be a new device (or the secret was cleared).")
-    console.print("Please input the [bold]Shared Secret[/bold] (from your Password Manager).\n")
+    console.print(
+        "Please input the [bold]Shared Secret[/bold] (from your Password Manager).\n"
+    )
 
     while True:
         secret = Prompt.ask("Input Shared Secret", password=True).strip()
@@ -66,27 +66,30 @@ def get_or_set_device_secret() -> str:
     if _should_use_keyring():
         try:
             keyring.set_password(APP_NAME, SECRET_KEY_NAME, secret)
-            console.print(f"[green]✓[/green] Secret saved to {platform.system()} Keychain")
+            console.print(
+                f"[green]✓[/green] Secret saved to {platform.system()} Keychain"
+            )
         except Exception as e:
             console.print(f"[red]Error saving to keychain: {e}[/red]")
             console.print("Continuing without saving (you will be prompted next time).")
 
     return secret
 
+
 def derive_key(master_password: str, shared_secret: str, salt: bytes) -> bytes:
-    """
-    Derive a 32-byte key using Argon2id.
-    
+    """Derive a 32-byte key using Argon2id.
+
     Params:
         master_password: User-provided password
         shared_secret: Device-specific secret
         salt: Random salt from the encrypted file
-        
+
     Returns:
         32-byte raw key
+
     """
     # Combine inputs
-    combined = master_password.encode('utf-8') + shared_secret.encode('utf-8')
+    combined = master_password.encode("utf-8") + shared_secret.encode("utf-8")
 
     # Argon2id parameters (High Security)
     # Memory: 64MB (65536 KB)
@@ -99,16 +102,18 @@ def derive_key(master_password: str, shared_secret: str, salt: bytes) -> bytes:
         memory_cost=65536,
         parallelism=2,
         hash_len=32,
-        type=Type.ID
+        type=Type.ID,
     )
 
-def decrypt_data(encrypted_data: bytes, master_password: str, shared_secret: str) -> bytes:
-    """
-    Decrypts data using XChaCha20-Poly1305.
-    
+
+def decrypt_data(
+    encrypted_data: bytes, master_password: str, shared_secret: str
+) -> bytes:
+    """Decrypts data using XChaCha20-Poly1305.
+
     Format: [Salt (16)] [Nonce (24)] [Ciphertext (...)]
     """
-    if len(encrypted_data) < 40: # 16 + 24
+    if len(encrypted_data) < 40:  # 16 + 24
         raise ValueError("Invalid encrypted data format (too short)")
 
     salt = encrypted_data[:16]
@@ -117,14 +122,14 @@ def decrypt_data(encrypted_data: bytes, master_password: str, shared_secret: str
 
     key = derive_key(master_password, shared_secret, salt)
     chacha = XChaCha20Poly1305(key)
-    
+
     # Decrypt (raises exception on auth failure)
     return chacha.decrypt(nonce, ciphertext, None)
 
+
 def encrypt_data(plaintext: bytes, master_password: str, shared_secret: str) -> bytes:
-    """
-    Encrypts data using XChaCha20-Poly1305.
-    
+    """Encrypts data using XChaCha20-Poly1305.
+
     Returns: [Salt (16)] [Nonce (24)] [Ciphertext (...)]
     """
     salt = os.urandom(16)
@@ -132,7 +137,7 @@ def encrypt_data(plaintext: bytes, master_password: str, shared_secret: str) -> 
 
     key = derive_key(master_password, shared_secret, salt)
     chacha = XChaCha20Poly1305(key)
-    
+
     ciphertext = chacha.encrypt(nonce, plaintext, None)
-    
+
     return salt + nonce + ciphertext

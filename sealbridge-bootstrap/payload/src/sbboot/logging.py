@@ -3,12 +3,13 @@
 
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from .config import BootstrapConfig
 
 # A set of keys that should be redacted from logs.
 REDACTED_KEYS = {"client_secret", "token", "passphrase"}
+
 
 class RedactingFilter(logging.Filter):
     """A logging filter that redacts sensitive information."""
@@ -18,7 +19,7 @@ class RedactingFilter(logging.Filter):
             record.args = self._redact_dict(record.args)
         return True
 
-    def _redact_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _redact_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively redact sensitive keys in a dictionary."""
         redacted_data = {}
         for key, value in data.items():
@@ -30,49 +31,53 @@ class RedactingFilter(logging.Filter):
                 redacted_data[key] = value
         return redacted_data
 
+
 def setup_logging(config: BootstrapConfig):
     """Configure the root logger for the application."""
     log_level = config.logging.level.upper()
 
     if config.logging.json_format:
         from logging.config import dictConfig
-        dictConfig({
-            'version': 1,
-            'disable_existing_loggers': False,
-            'filters': {
-                'redacting': {
-                    '()': RedactingFilter,
+
+        dictConfig(
+            {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "filters": {
+                    "redacting": {
+                        "()": RedactingFilter,
+                    },
                 },
-            },
-            'formatters': {
-                'json': {
-                    '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-                    'format': '%(asctime)s %(name)s %(levelname)s %(message)s',
+                "formatters": {
+                    "json": {
+                        "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+                        "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+                    },
                 },
-            },
-            'handlers': {
-                'json': {
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'json',
-                    'filters': ['redacting'],
+                "handlers": {
+                    "json": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "json",
+                        "filters": ["redacting"],
+                    },
                 },
-            },
-            'loggers': {
-                'sbboot': {
-                    'handlers': ['json'],
-                    'level': log_level,
-                    'propagate': False,
-                },
-                '': { # Root logger
-                    'handlers': ['json'],
-                    'level': log_level,
+                "loggers": {
+                    "sbboot": {
+                        "handlers": ["json"],
+                        "level": log_level,
+                        "propagate": False,
+                    },
+                    "": {  # Root logger
+                        "handlers": ["json"],
+                        "level": log_level,
+                    },
                 },
             }
-        })
+        )
     else:
         logging.basicConfig(
             level=log_level,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             stream=sys.stderr,
         )
         for handler in logging.root.handlers:

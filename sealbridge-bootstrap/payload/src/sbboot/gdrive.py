@@ -1,12 +1,11 @@
 # src/sbboot/gdrive.py
 """Google Drive sync setup for SealBridge Bootstrap."""
 
+import json
 import os
 import subprocess
-import json
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -24,7 +23,7 @@ def install_rclone(policy_manager) -> Path:
         return rclone_path
 
     console.print("[yellow]Installing rclone...[/yellow]")
-    
+
     # Install rclone using official installer
     # Download installer script first, then execute separately to avoid shell=True
     try:
@@ -37,12 +36,14 @@ def install_rclone(policy_manager) -> Path:
             timeout=30,
         )
         if download_result.returncode != 0:
-            raise SealBridgeError(f"Failed to download rclone installer: {download_result.stderr}")
-        
+            raise SealBridgeError(
+                f"Failed to download rclone installer: {download_result.stderr}"
+            )
+
         # Write to temp file
         install_script_path.write_text(download_result.stdout)
         install_script_path.chmod(0o755)  # Make executable
-        
+
         # Execute installer with sudo bash
         result = subprocess.run(
             ["sudo", "bash", str(install_script_path)],
@@ -50,17 +51,17 @@ def install_rclone(policy_manager) -> Path:
             text=True,
             timeout=60,
         )
-        
+
         # Clean up temp file
         install_script_path.unlink(missing_ok=True)
         if result.returncode != 0:
             raise SealBridgeError(f"Failed to install rclone: {result.stderr}")
-        
+
         # Find rclone after installation
         rclone_path = _find_rclone()
         if not rclone_path:
             raise SealBridgeError("rclone installed but not found in PATH")
-        
+
         console.print(f"✅ [green]rclone installed at {rclone_path}[/green]")
         return rclone_path
     except subprocess.TimeoutExpired:
@@ -69,7 +70,7 @@ def install_rclone(policy_manager) -> Path:
         raise SealBridgeError(f"Failed to install rclone: {e}")
 
 
-def _find_rclone() -> Optional[Path]:
+def _find_rclone() -> Path | None:
     """Find rclone in PATH."""
     rclone_path = subprocess.run(
         ["which", "rclone"],
@@ -86,20 +87,22 @@ def setup_google_drive_sync(
     token_data: dict,
     policy_manager,
 ) -> None:
-    """
-    Set up Google Drive bidirectional sync using rclone bisync.
-    
+    """Set up Google Drive bidirectional sync using rclone bisync.
+
     Args:
         config: Google Drive configuration from bootstrap.yaml
         token_data: Decrypted Google Drive OAuth token (token.json content)
         policy_manager: Policy manager for filesystem access
+
     """
     if not config.get("enabled", False):
         console.print("[yellow]Google Drive sync is disabled, skipping setup[/yellow]")
         return
 
     if config.get("sync_mode") != "bidirectional":
-        console.print(f"[yellow]Sync mode '{config.get('sync_mode')}' not supported, skipping[/yellow]")
+        console.print(
+            f"[yellow]Sync mode '{config.get('sync_mode')}' not supported, skipping[/yellow]"
+        )
         return
 
     console.print("\n[bold]Setting up Google Drive bidirectional sync...[/bold]")
@@ -108,8 +111,16 @@ def setup_google_drive_sync(
     rclone_path = install_rclone(policy_manager)
 
     # Set up paths
-    sync_path = Path(os.path.expandvars(config.get("sync_path", "${HOME}/workspace/gdrive")))
-    token_file = Path(os.path.expandvars(config.get("token_file", "${HOME}/.config/sealbridge/google-drive/token.json")))
+    sync_path = Path(
+        os.path.expandvars(config.get("sync_path", "${HOME}/workspace/gdrive"))
+    )
+    token_file = Path(
+        os.path.expandvars(
+            config.get(
+                "token_file", "${HOME}/.config/sealbridge/google-drive/token.json"
+            )
+        )
+    )
     rclone_config_dir = paths.get_xdg_config_home() / "rclone"
     rclone_config_file = rclone_config_dir / "rclone.conf"
 
@@ -119,7 +130,7 @@ def setup_google_drive_sync(
     rclone_config_dir.mkdir(parents=True, exist_ok=True)
 
     # Save token file
-    console.print(f"[yellow]Saving Google Drive token...[/yellow]")
+    console.print("[yellow]Saving Google Drive token...[/yellow]")
     token_file.write_text(json.dumps(token_data, indent=2))
     token_file.chmod(0o600)  # Secure permissions
     console.print(f"✅ [green]Token saved to {token_file}[/green]")
@@ -127,16 +138,16 @@ def setup_google_drive_sync(
     # Configure rclone remote
     remote_name = config.get("remote_name", "gdrive")
     console.print(f"[yellow]Configuring rclone remote '{remote_name}'...[/yellow]")
-    
+
     # Create rclone config
     rclone_config = f"""[{remote_name}]
 type = drive
-client_id = {token_data.get('client_id', '')}
-client_secret = {token_data.get('client_secret', '')}
-token = {json.dumps(token_data.get('token', {}))}
-refresh_token = {token_data.get('refresh_token', '')}
+client_id = {token_data.get("client_id", "")}
+client_secret = {token_data.get("client_secret", "")}
+token = {json.dumps(token_data.get("token", {}))}
+refresh_token = {token_data.get("refresh_token", "")}
 """
-    
+
     # Append to existing config or create new
     if rclone_config_file.exists():
         existing = rclone_config_file.read_text()
@@ -144,7 +155,7 @@ refresh_token = {token_data.get('refresh_token', '')}
             rclone_config_file.write_text(existing + "\n" + rclone_config)
     else:
         rclone_config_file.write_text(rclone_config)
-    
+
     rclone_config_file.chmod(0o600)
     console.print(f"✅ [green]rclone config saved to {rclone_config_file}[/green]")
 
@@ -156,15 +167,21 @@ refresh_token = {token_data.get('refresh_token', '')}
         timeout=10,
     )
     if result.returncode == 0 and remote_name in result.stdout:
-        console.print(f"✅ [green]rclone remote '{remote_name}' configured successfully[/green]")
+        console.print(
+            f"✅ [green]rclone remote '{remote_name}' configured successfully[/green]"
+        )
     else:
-        console.print(f"[yellow]Warning:[/yellow] Could not verify rclone remote: {result.stderr}")
+        console.print(
+            f"[yellow]Warning:[/yellow] Could not verify rclone remote: {result.stderr}"
+        )
 
     # Set up bidirectional sync using rclone bisync
     folders = config.get("folders", [])
     if not folders:
         # Sync entire Google Drive
-        console.print("[yellow]Setting up full Google Drive bidirectional sync...[/yellow]")
+        console.print(
+            "[yellow]Setting up full Google Drive bidirectional sync...[/yellow]"
+        )
         _setup_bisync_service(
             rclone_path,
             rclone_config_file,
@@ -188,7 +205,9 @@ refresh_token = {token_data.get('refresh_token', '')}
                 config.get("sync_interval_minutes", 15),
             )
 
-    console.print("✅ [bold green]Google Drive bidirectional sync configured![/bold green]")
+    console.print(
+        "✅ [bold green]Google Drive bidirectional sync configured![/bold green]"
+    )
 
 
 def _setup_bisync_service(
@@ -201,11 +220,17 @@ def _setup_bisync_service(
 ) -> None:
     """Set up systemd service and timer for rclone bisync."""
     if paths.is_windows():
-        console.print("[yellow]Windows detected - systemd services not available[/yellow]")
-        console.print("[yellow]Google Drive sync will need to be set up manually on Windows[/yellow]")
+        console.print(
+            "[yellow]Windows detected - systemd services not available[/yellow]"
+        )
+        console.print(
+            "[yellow]Google Drive sync will need to be set up manually on Windows[/yellow]"
+        )
         return
 
-    service_name = f"rclone-bisync-{remote_path.replace('/', '-') if remote_path else 'root'}"
+    service_name = (
+        f"rclone-bisync-{remote_path.replace('/', '-') if remote_path else 'root'}"
+    )
     remote_full = f"{remote_name}:{remote_path}" if remote_path else f"{remote_name}:"
 
     # Create systemd service
@@ -235,8 +260,12 @@ RandomizedDelaySec=2min
 WantedBy=timers.target
 """
 
-    service_file = paths.get_xdg_config_home() / "systemd" / "user" / f"{service_name}.service"
-    timer_file = paths.get_xdg_config_home() / "systemd" / "user" / f"{service_name}.timer"
+    service_file = (
+        paths.get_xdg_config_home() / "systemd" / "user" / f"{service_name}.service"
+    )
+    timer_file = (
+        paths.get_xdg_config_home() / "systemd" / "user" / f"{service_name}.timer"
+    )
 
     service_file.parent.mkdir(parents=True, exist_ok=True)
     service_file.write_text(service_content)
@@ -259,10 +288,11 @@ WantedBy=timers.target
             check=True,
             timeout=10,
         )
-        console.print(f"✅ [green]Systemd timer '{service_name}.timer' enabled and started[/green]")
+        console.print(
+            f"✅ [green]Systemd timer '{service_name}.timer' enabled and started[/green]"
+        )
     except subprocess.CalledProcessError as e:
         console.print(f"[yellow]Warning:[/yellow] Failed to enable systemd timer: {e}")
         console.print("[yellow]You may need to enable it manually:[/yellow]")
         console.print(f"  systemctl --user enable {service_name}.timer")
         console.print(f"  systemctl --user start {service_name}.timer")
-

@@ -1,11 +1,10 @@
 # tests/unit/test_agent.py
 import os
-import subprocess
-import pytest
+
 from pytest_mock import MockerFixture
 
-from sbboot import agent, paths
-from sbboot.errors import SshAgentError
+from sbboot import agent
+
 
 def test_agent_manager_posix_existing(mocker: MockerFixture):
     mocker.patch.dict(os.environ, {"SSH_AUTH_SOCK": "/tmp/agent.sock"})
@@ -17,6 +16,7 @@ def test_agent_manager_posix_existing(mocker: MockerFixture):
 
     mock_popen.assert_not_called()
 
+
 def test_agent_manager_posix_start_new(mocker: MockerFixture, monkeypatch):
     monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
     mocker.patch("sbboot.paths.is_windows", return_value=False)
@@ -24,7 +24,7 @@ def test_agent_manager_posix_start_new(mocker: MockerFixture, monkeypatch):
     mock_proc = mocker.Mock()
     mock_proc.communicate.return_value = (
         "SSH_AUTH_SOCK=/tmp/agent.sock; export SSH_AUTH_SOCK;\nSSH_AGENT_PID=1234; export SSH_AGENT_PID;\necho Agent pid 1234;",
-        ""
+        "",
     )
     mock_proc.returncode = 0
     mock_popen = mocker.patch("subprocess.Popen", return_value=mock_proc)
@@ -38,6 +38,7 @@ def test_agent_manager_posix_start_new(mocker: MockerFixture, monkeypatch):
     mock_popen.assert_called_once()
     mock_proc.terminate.assert_called_once()
 
+
 def test_agent_manager_windows_running(mocker: MockerFixture):
     mocker.patch("sbboot.paths.is_windows", return_value=True)
     mock_run = mocker.patch("subprocess.run")
@@ -47,6 +48,7 @@ def test_agent_manager_windows_running(mocker: MockerFixture):
         pass
 
     mock_run.assert_called_once()
+
 
 def test_agent_manager_windows_start_service(mocker: MockerFixture):
     mocker.patch("sbboot.paths.is_windows", return_value=True)
@@ -63,6 +65,7 @@ def test_agent_manager_windows_start_service(mocker: MockerFixture):
     assert mock_run.call_count == 3
     assert "Start-Service ssh-agent" in mock_run.call_args_list[1].args[0]
 
+
 def test_agent_add_key(mocker: MockerFixture):
     mocker.patch("sbboot.paths.is_windows", return_value=False)
     mock_run = mocker.patch("subprocess.run")
@@ -71,8 +74,5 @@ def test_agent_add_key(mocker: MockerFixture):
     manager.add_key(b"PRIVATE KEY DATA")
 
     mock_run.assert_called_once_with(
-        ["ssh-add", "-"],
-        input=b"PRIVATE KEY DATA",
-        capture_output=True,
-        check=True
+        ["ssh-add", "-"], input=b"PRIVATE KEY DATA", capture_output=True, check=True
     )
