@@ -326,55 +326,36 @@ main() {
     _info "Installing sbboot package..."
     "$UV_CMD" pip install -e . --native-tls || _err "Failed to install sbboot package"
     
-    # Verify cryptography is properly installed and can import XChaCha20Poly1305
-    _info "Verifying cryptography installation..."
+    # Verify PyNaCl is properly installed and can import crypto_aead functions
+    _info "Verifying PyNaCl installation..."
     set +e
-    CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
-    CRYPTO_CHECK_EXIT=$?
+    NACL_CHECK="$(".venv/bin/python" -c "from nacl.bindings import crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt; print('OK')" 2>&1)"
+    NACL_CHECK_EXIT=$?
     set -e
-    if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
-        _warn "Cryptography import check failed, attempting to reinstall..."
-        # Try latest version first (most secure and likely to work)
-        _info "Trying latest cryptography version..."
+    if [ $NACL_CHECK_EXIT -ne 0 ]; then
+        _warn "PyNaCl import check failed, attempting to reinstall..."
         set +e
-        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography' --native-tls 2>&1
-        LATEST_INSTALL_EXIT=$?
+        "$UV_CMD" pip install --force-reinstall --no-cache 'PyNaCl>=1.5.0' --native-tls 2>&1
+        NACL_INSTALL_EXIT=$?
         set -e
         
-        if [ $LATEST_INSTALL_EXIT -eq 0 ]; then
-            # Verify latest version works
+        if [ $NACL_INSTALL_EXIT -eq 0 ]; then
+            # Verify installation works
             set +e
-            CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
-            CRYPTO_CHECK_EXIT=$?
+            NACL_CHECK="$(".venv/bin/python" -c "from nacl.bindings import crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt; print('OK')" 2>&1)"
+            NACL_CHECK_EXIT=$?
             set -e
-            if [ $CRYPTO_CHECK_EXIT -eq 0 ]; then
-                _info "Cryptography latest version installed and verified successfully"
-            fi
-        fi
-        
-        # If latest failed, try minimum required version
-        if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
-            _warn "Latest version failed, trying minimum required version (>=42.0.0)..."
-            set +e
-            "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography>=42.0.0' --native-tls 2>&1
-            MIN_INSTALL_EXIT=$?
-            set -e
-            
-            if [ $MIN_INSTALL_EXIT -eq 0 ]; then
-                # Verify minimum version works
-                set +e
-                CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
-                CRYPTO_CHECK_EXIT=$?
-                set -e
+            if [ $NACL_CHECK_EXIT -eq 0 ]; then
+                _info "PyNaCl installed and verified successfully"
             fi
         fi
         
         # Final check - if still failing, show debug info
-        if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
-            _warn "Cryptography debug info:"
-            ".venv/bin/python" -c "import cryptography; print(f'Version: {cryptography.__version__}')" 2>&1 || true
-            ".venv/bin/python" -c "import cryptography.hazmat.primitives.ciphers.aead as aead; print(f'Available: {[x for x in dir(aead) if not x.startswith(\"_\")]}')" 2>&1 || true
-            _err "Cryptography installation is broken. XChaCha20Poly1305 not available. Error: $CRYPTO_CHECK"
+        if [ $NACL_CHECK_EXIT -ne 0 ]; then
+            _warn "PyNaCl debug info:"
+            ".venv/bin/python" -c "import nacl; print(f'Version: {nacl.__version__}')" 2>&1 || true
+            ".venv/bin/python" -c "import nacl.bindings; print(f'Available: {[x for x in dir(nacl.bindings) if \"xchacha20\" in x.lower()]}')" 2>&1 || true
+            _err "PyNaCl installation is broken. XChaCha20Poly1305 functions not available. Error: $NACL_CHECK"
         fi
     fi
 

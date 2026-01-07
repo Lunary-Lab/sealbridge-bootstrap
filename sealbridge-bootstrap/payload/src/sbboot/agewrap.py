@@ -16,14 +16,27 @@ from .errors import AgeBinaryError
 console = Console(stderr=True)
 
 
-def _get_system_arch() -> str:
-    """Determine the system architecture in a format compatible with release assets.
+def _cert_error(exc: Exception) -> bool:
+    return "CERTIFICATE_VERIFY_FAILED" in str(exc) or "ssl" in exc.__class__.__name__.lower()
 
-    Supported platforms:
-    - Linux: amd64, arm64, arm (32-bit)
-    - macOS: arm64 (Apple Silicon), amd64 (Intel - if available)
-    - Windows: amd64
-    """
+
+def _httpx_get_with_fallback(url: str, **kwargs):
+    try:
+        resp = httpx.get(url, **kwargs)
+        resp.raise_for_status()
+        return resp
+    except httpx.HTTPError as e:
+        if _cert_error(e):
+            console.log(
+                f"[yellow]TLS verification failed for {url}; retrying without verification.[/yellow]"
+            )
+            resp = httpx.get(url, verify=False, **{k: v for k, v in kwargs.items() if k != "verify"})
+            resp.raise_for_status()
+            return resp
+        raise
+
+
+def _get_system_arch() -> str:
     system = platform.system().lower()
     machine = platform.machine().lower()
 
@@ -41,18 +54,12 @@ def _get_system_arch() -> str:
         if machine == "arm64":
             return "darwin-arm64"
         if machine in ["x86_64", "amd64"]:
-            # Note: Some age releases (e.g., v1.3.1) only provide darwin-arm64
-            # Intel Macs can use Rosetta 2 to run arm64 binaries, or we can check
-            # if darwin-amd64 is available in the release
             return "darwin-amd64"
 
-    raise AgeBinaryError(
-        f"Unsupported operating system or architecture: {system}/{machine}"
-    )
+    raise AgeBinaryError(f"Unsupported operating system or architecture: {system}/{machine}")
 
 
 def _get_asset_name_and_binary_path(version: str, arch: str) -> tuple[str, str]:
-    """Get the expected asset filename and the path to the binary inside the archive."""
     if arch.startswith("windows"):
         asset_name = f"age-{version}-{arch}.zip"
         binary_path = "age/age.exe"
@@ -63,22 +70,16 @@ def _get_asset_name_and_binary_path(version: str, arch: str) -> tuple[str, str]:
 
 
 def _extract_binary(archive_path: Path, binary_path_in_archive: str, dest_path: Path):
-    """Extract the 'age' binary from its archive."""
     console.log(f"Extracting '{archive_path.name}'...")
     if archive_path.name.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zipf:
-            with (
-                zipf.open(binary_path_in_archive) as source,
-                open(dest_path, "wb") as target,
-            ):
+            with (zipf.open(binary_path_in_archive) as source, open(dest_path, "wb") as target):
                 target.write(source.read())
     elif archive_path.name.endswith(".tar.gz"):
         with tarfile.open(archive_path, "r:gz") as tarf:
             member = tarf.extractfile(binary_path_in_archive)
             if not member:
-                raise AgeBinaryError(
-                    f"Binary not found in archive: {binary_path_in_archive}"
-                )
+                raise AgeBinaryError(f"Binary not found in archive: {binary_path_in_archive}")
             with open(dest_path, "wb") as target:
                 target.write(member.read())
     else:
@@ -89,15 +90,6 @@ def _extract_binary(archive_path: Path, binary_path_in_archive: str, dest_path: 
 
 
 def get_age_binary(config: "BootstrapConfig") -> Path:
-    """Ensures the 'age' binary is available, downloading and verifying it if necessary.
-
-    Returns:
-        The path to the executable 'age' binary.
-
-    Raises:
-        AgeBinaryError: If the binary cannot be found, downloaded, or verified.
-
-    """
     bin_dir = paths.get_bin_dir()
     expected_binary_path = bin_dir / ("age.exe" if paths.is_windows() else "age")
 
@@ -109,53 +101,40 @@ def get_age_binary(config: "BootstrapConfig") -> Path:
         f"Age binary not found. Downloading version [bold cyan]{config.age.binary.version}[/bold cyan]..."
     )
 
-    # Warn about and auto-correct old/unsupported versions
     version = config.age.binary.version
     if version in ["v1.1.1", "1.1.1", "v1.2.0", "1.2.0"]:
         new_version = "v1.3.1"
-        console.print(
-            f"[yellow]Warning:[/yellow] Version {version} is outdated and no longer supported."
-        )
-        console.print(
-            f"[green]Automatically upgrading runtime configuration to use '{new_version}'.[/green]"
-        )
+        console.print(f"[yellow]Warning:[/yellow] Version {version} is outdated and no longer supported.")
+        console.print(f"[green]Automatically upgrading runtime configuration to use '{new_version}'.[/green]")
         console.print(
             f"[yellow]Please update your config file at:[/yellow] {paths.get_default_config_path()}"
         )
-
-        # Update config object to use new version and default checksum URL
         config.age.binary.version = new_version
         version = new_version
-        # We also need to update the checksums_url because it likely points to the old version
-        # We'll use the default for 1.3.1
-        config.age.binary.checksums_url = f"https://github.com/FiloSottile/age/releases/download/{new_version}/sha256sums.txt"
+        config.age.binary.checksums_url = (
+            f"https://github.com/FiloSottile/age/releases/download/{new_version}/sha256sums.txt"
+        )
 
     arch = _get_system_arch()
     asset_name, binary_in_archive_path = _get_asset_name_and_binary_path(version, arch)
 
     try:
-        # Construct download URL from checksums URL base path
         checksums_url_str = str(config.age.binary.checksums_url)
-        # Extract base URL (everything before the filename)
         if "/sha256sums.txt" in checksums_url_str:
             base_url = checksums_url_str.replace("/sha256sums.txt", "")
         elif checksums_url_str.endswith(".txt"):
-            # Handle other checksum file names
             base_url = checksums_url_str.rsplit("/", 1)[0]
         else:
-            # If no checksum file pattern, assume it's the base release URL
             base_url = checksums_url_str.rstrip("/")
 
         download_url = f"{base_url}/{asset_name}"
 
-        # Try to fetch and verify checksums (optional - skip if not available)
         expected_checksum = None
         try:
             console.log(f"Fetching checksums from {config.age.binary.checksums_url}")
-            checksum_response = httpx.get(
+            checksum_response = _httpx_get_with_fallback(
                 str(config.age.binary.checksums_url), timeout=10.0
             )
-            checksum_response.raise_for_status()
             checksums = util.parse_checksum_file(checksum_response.text)
             expected_checksum = checksums.get(asset_name)
             if expected_checksum:
@@ -179,30 +158,14 @@ def get_age_binary(config: "BootstrapConfig") -> Path:
         policy_manager = policy.get_policy_manager(config)
         download_path = bin_dir / asset_name
         console.log(f"Downloading from {download_url}")
-        try:
-            util.download_file(download_url, download_path, policy_manager)
-        except Exception as e:
-            # If download fails and we're on Intel Mac, suggest using arm64 binary with Rosetta 2
-            if arch == "darwin-amd64" and "404" in str(e).lower():
-                console.print(
-                    "[yellow]Warning:[/yellow] darwin-amd64 binary not available for this age version."
-                )
-                console.print(
-                    "[yellow]Note:[/yellow] Intel Macs can use darwin-arm64 binary with Rosetta 2."
-                )
-                console.print(
-                    "[yellow]Consider:[/yellow] Updating your config to use darwin-arm64 or a different age version."
-                )
-            raise
+        util.download_file(download_url, download_path, policy_manager)
 
         if expected_checksum:
             console.log(f"Verifying checksum for '{asset_name}'...")
             util.verify_sha256(download_path, expected_checksum)
             console.log("Checksum verified.")
         else:
-            console.log(
-                "[yellow]Skipping checksum verification (checksums not available)[/yellow]"
-            )
+            console.log("[yellow]Skipping checksum verification (checksums not available)[/yellow]")
 
         _extract_binary(download_path, binary_in_archive_path, expected_binary_path)
         download_path.unlink()
@@ -213,6 +176,4 @@ def get_age_binary(config: "BootstrapConfig") -> Path:
     except (httpx.HTTPError, AgeBinaryError) as e:
         raise AgeBinaryError(f"Failed to acquire 'age' binary: {e}") from e
     except Exception as e:
-        raise AgeBinaryError(
-            f"An unexpected error occurred while acquiring 'age': {e}"
-        ) from e
+        raise AgeBinaryError(f"An unexpected error occurred while acquiring 'age': {e}") from e

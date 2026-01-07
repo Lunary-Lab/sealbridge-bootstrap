@@ -8,14 +8,11 @@ import platform
 # External dependencies (validated in pyproject.toml)
 import keyring
 from argon2.low_level import Type, hash_secret_raw
-try:
-    from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305
-except ImportError as e:
-    raise ImportError(
-        f"Failed to import XChaCha20Poly1305 from cryptography: {e}\n"
-        "This usually means the cryptography package is not properly installed or is too old.\n"
-        "Please ensure cryptography>=42.0.0 is installed: pip install --upgrade 'cryptography>=42.0.0'"
-    ) from e
+from nacl import utils as nacl_utils
+from nacl.bindings import (
+    crypto_aead_xchacha20poly1305_ietf_decrypt,
+    crypto_aead_xchacha20poly1305_ietf_encrypt,
+)
 from rich.console import Console
 from rich.prompt import Prompt
 
@@ -23,6 +20,36 @@ console = Console(stderr=True)
 
 APP_NAME = "SealBridge"
 SECRET_KEY_NAME = "DeviceSecret"
+
+
+class XChaCha20Poly1305:
+    """Compatibility wrapper providing the cryptography-style API using libsodium."""
+
+    KEY_SIZE = 32
+    NONCE_SIZE = 24
+
+    def __init__(self, key: bytes):
+        if not isinstance(key, (bytes, bytearray)):
+            raise TypeError("key must be bytes")
+        if len(key) != self.KEY_SIZE:
+            raise ValueError(f"key must be {self.KEY_SIZE} bytes")
+        self._key = bytes(key)
+
+    @staticmethod
+    def generate_key() -> bytes:
+        return nacl_utils.random(XChaCha20Poly1305.KEY_SIZE)
+
+    def encrypt(self, nonce: bytes, data: bytes, associated_data: bytes | None = None) -> bytes:
+        if len(nonce) != self.NONCE_SIZE:
+            raise ValueError(f"nonce must be {self.NONCE_SIZE} bytes")
+        aad = associated_data or b""
+        return crypto_aead_xchacha20poly1305_ietf_encrypt(data, aad, nonce, self._key)
+
+    def decrypt(self, nonce: bytes, data: bytes, associated_data: bytes | None = None) -> bytes:
+        if len(nonce) != self.NONCE_SIZE:
+            raise ValueError(f"nonce must be {self.NONCE_SIZE} bytes")
+        aad = associated_data or b""
+        return crypto_aead_xchacha20poly1305_ietf_decrypt(data, aad, nonce, self._key)
 
 
 def _is_macos() -> bool:
@@ -60,7 +87,7 @@ def get_or_set_device_secret() -> str:
 
     if secret:
         console.print(
-            f"[green]✓[/green] Device authorized (Secret loaded from {platform.system()} Keychain)"
+            f"[green]\u2713[/green] Device authorized (Secret loaded from {platform.system()} Keychain)"
         )
         return secret
 
@@ -82,7 +109,7 @@ def get_or_set_device_secret() -> str:
         try:
             keyring.set_password(APP_NAME, SECRET_KEY_NAME, secret)
             console.print(
-                f"[green]✓[/green] Secret saved to {platform.system()} Keychain"
+                f"[green]\u2713[/green] Secret saved to {platform.system()} Keychain"
             )
         except Exception as e:
             console.print(f"[red]Error saving to keychain: {e}[/red]")
