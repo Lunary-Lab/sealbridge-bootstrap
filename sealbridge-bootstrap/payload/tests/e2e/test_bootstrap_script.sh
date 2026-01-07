@@ -40,13 +40,13 @@ if ! grep -q "_check_dep" "$BOOTSTRAP_SCRIPT"; then
     exit 1
 fi
 
-# Test that it handles Python correctly (should use system Python, not try to install)
-if grep -q "uv python install" "$BOOTSTRAP_SCRIPT"; then
-    echo "WARNING: bootstrap.sh still tries to install Python via uv (may fail with SSL issues)"
+# Test that it installs Python via uv (required - cannot use system Python)
+if ! grep -q "uv python install" "$BOOTSTRAP_SCRIPT"; then
+    echo "ERROR: bootstrap.sh must install Python via uv (cannot use system Python)"
     exit 1
 fi
 
 echo "✅ Bootstrap script structure looks good"
-echo "✅ Script uses system Python (no uv python install)"
+echo "✅ Script installs Python via uv (required)"
 exit 0
 

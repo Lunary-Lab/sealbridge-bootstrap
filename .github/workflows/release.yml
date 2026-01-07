@@ -30,7 +30,7 @@ jobs:
           source .venv/bin/activate
           uv pip sync requirements.lock
           uv pip install -e .
-          uv pip install pytest
+          uv pip install pytest docker
       - name: Test bootstrap script structure
         working-directory: sealbridge-bootstrap
         run: |
