@@ -42,12 +42,13 @@ def docker_client():
 @pytest.fixture(scope="module")
 def bootstrap_image(docker_client):
     image_tag = "sealbridge-bootstrap-full-system:latest"
-    dockerfile_path = str(Path(__file__).parent.parent.parent.absolute())
+    # Path to repo root (3 levels up from test file)
+    repo_root = Path(__file__).parent.parent.parent.parent.parent
 
     try:
         image, logs = docker_client.images.build(
-            path=dockerfile_path,
-            dockerfile="payload/tests/e2e/Dockerfile.ubuntu",
+            path=str(repo_root),
+            dockerfile="sealbridge-bootstrap/payload/tests/e2e/Dockerfile.ubuntu",
             tag=image_tag,
             rm=True
         )

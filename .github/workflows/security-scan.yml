@@ -22,7 +22,9 @@ jobs:
       
       - name: Install Gitleaks
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/v8.22.0/scripts/install.sh | sh -s -- -b /usr/local/bin v8.22.0
+          wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.22.0/gitleaks_8.22.0_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+          chmod +x /usr/local/bin/gitleaks
       
       - name: Run Gitleaks on repository
         env:
