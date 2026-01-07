@@ -424,6 +424,25 @@ main() {
 
     _info "Installing sbboot package..."
     "$UV_CMD" pip install -e . || _err "Failed to install sbboot package"
+    
+    # Verify cryptography is properly installed and can import XChaCha20Poly1305
+    _info "Verifying cryptography installation..."
+    set +e
+    CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
+    CRYPTO_CHECK_EXIT=$?
+    set -e
+    if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
+        _warn "Cryptography import check failed, attempting to reinstall..."
+        "$UV_CMD" pip install --force-reinstall --no-cache 'cryptography>=42.0.0' || _err "Failed to reinstall cryptography"
+        # Verify again
+        set +e
+        CRYPTO_CHECK="$(".venv/bin/python" -c "from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305; print('OK')" 2>&1)"
+        CRYPTO_CHECK_EXIT=$?
+        set -e
+        if [ $CRYPTO_CHECK_EXIT -ne 0 ]; then
+            _err "Cryptography installation is broken. Please check your Python environment and system dependencies."
+        fi
+    fi
 
     # Ensure XDG directories exist
     XDG_DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
