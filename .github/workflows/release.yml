@@ -33,7 +33,7 @@ jobs:
           uv pip install pytest docker
       - name: Test bootstrap script structure
         run: |
-          cd sealbridge-bootstrap && bash sealbridge-bootstrap/payload/tests/e2e/test_bootstrap_script.sh
+          bash sealbridge-bootstrap/sealbridge-bootstrap/payload/tests/e2e/test_bootstrap_script.sh
       
       - name: Run E2E tests (isolated - macOS)
         working-directory: sealbridge-bootstrap/payload
