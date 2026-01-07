@@ -221,37 +221,9 @@ main() {
     _info "Installing Python 3.11 via uv..."
     
     # Check if Python 3.11 is already installed via uv
-    PYTHON_SPEC=""
-    PYTHON_PATH=""
     if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
         _info "Python 3.11 already installed via uv"
-        # Try to get the actual path to the installed Python from uv's cache
-        # uv stores Python at: ~/.local/share/uv/python/cpython-{version}+{date}-{arch}/
-        UV_PYTHON_BASE="$HOME/.local/share/uv/python"
-        if [ -d "$UV_PYTHON_BASE" ]; then
-            # Find Python 3.11 installation
-            PYTHON_PATH=$(find "$UV_PYTHON_BASE" -name "python3.11" -type f 2>/dev/null | head -1)
-            if [ -z "$PYTHON_PATH" ]; then
-                # Try to find python3 or python in a 3.11 directory
-                PYTHON_DIR=$(find "$UV_PYTHON_BASE" -type d -name "*3.11*" 2>/dev/null | head -1)
-                if [ -n "$PYTHON_DIR" ]; then
-                    for py_name in "python3.11" "python3" "python"; do
-                        if [ -x "$PYTHON_DIR/$py_name" ]; then
-                            PYTHON_PATH="$PYTHON_DIR/$py_name"
-                            break
-                        fi
-                    done
-                fi
-            fi
-        fi
-        
-        if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
-            PYTHON_SPEC="$PYTHON_PATH"
-            _info "Found Python 3.11 at: $PYTHON_PATH"
-        else
-            # Fall back to version specifier (uv will try to verify/download)
-            PYTHON_SPEC="3.11"
-        fi
+        PYTHON_SPEC="3.11"
     else
         # Try to install Python 3.11 via uv
         # On macOS with corporate proxies, uv may fail due to SSL certificate issues
@@ -368,28 +340,41 @@ main() {
     
     _info "Creating Python virtual environment with Python $PYTHON_SPEC..."
     
-    # Try to create venv - if it fails with SSL error, use workaround
+    # Try to create venv - if it fails with SSL error, try to use Python path directly
     VENV_OUTPUT="$("$UV_CMD" venv --python "$PYTHON_SPEC" 2>&1)"
     VENV_EXIT=$?
     
     if [ $VENV_EXIT -ne 0 ]; then
         # Check if it's an SSL certificate error
         if echo "$VENV_OUTPUT" | grep -qi "certificate\|SSL\|TLS\|peer certificate"; then
-            _warn "uv venv failed due to SSL certificate issues"
-            _warn "Python 3.11 is installed but uv cannot verify it. Trying workaround..."
+            _warn "uv venv failed due to SSL certificate issues when verifying Python 3.11"
+            _warn "Attempting to use Python 3.11 directly from uv cache..."
             
-            # If we have a Python path, try using it directly
+            # Find Python 3.11 in uv's cache
+            UV_PYTHON_BASE="$HOME/.local/share/uv/python"
+            PYTHON_PATH=""
+            if [ -d "$UV_PYTHON_BASE" ]; then
+                # Find Python 3.11 executable
+                PYTHON_PATH=$(find "$UV_PYTHON_BASE" -name "python3.11" -type f -executable 2>/dev/null | head -1)
+                if [ -z "$PYTHON_PATH" ]; then
+                    # Try to find in a 3.11 directory
+                    PYTHON_DIR=$(find "$UV_PYTHON_BASE" -type d -name "*3.11*" 2>/dev/null | head -1)
+                    if [ -n "$PYTHON_DIR" ]; then
+                        for py_name in "python3.11" "python3" "python"; do
+                            if [ -x "$PYTHON_DIR/$py_name" ]; then
+                                PYTHON_PATH="$PYTHON_DIR/$py_name"
+                                break
+                            fi
+                        done
+                    fi
+                fi
+            fi
+            
             if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
-                _info "Using Python directly: $PYTHON_PATH"
-                "$UV_CMD" venv --python "$PYTHON_PATH" || {
-                    _warn "Direct Python path failed, trying without --python flag..."
-                    # Last resort: let uv use whatever Python it finds
-                    "$UV_CMD" venv || _err "Failed to create virtual environment"
-                }
+                _info "Using Python directly from cache: $PYTHON_PATH"
+                "$UV_CMD" venv --python "$PYTHON_PATH" || _err "Failed to create virtual environment with Python from cache"
             else
-                # Try without specifying Python version - let uv use what it finds
-                _warn "Trying to create venv without specifying Python version..."
-                "$UV_CMD" venv || _err "Failed to create virtual environment. SSL certificate issues detected."
+                _err "Failed to create virtual environment. Python 3.11 is installed but cannot be accessed due to SSL certificate issues."
             fi
         else
             _err "Failed to create virtual environment: $VENV_OUTPUT"
