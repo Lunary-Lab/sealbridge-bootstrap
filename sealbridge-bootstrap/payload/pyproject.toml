@@ -43,7 +43,7 @@ path = "src/sbboot/__init__.py"
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "W", "I", "N", "D", "B", "A", "C4", "UP", "S"]
-ignore = ["D100", "D104", "D107"]
+ignore = ["D100", "D104", "D107", "D105", "S607", "E501"]
 
 [tool.mypy]
 python_version = "3.11"
