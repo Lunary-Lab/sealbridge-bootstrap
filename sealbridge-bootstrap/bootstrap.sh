@@ -255,8 +255,11 @@ main() {
         fi
         
         # Try to install Python via uv
+        # Temporarily disable exit on error to capture the error
+        set +e
         UV_OUTPUT="$("$UV_CMD" python install 3.11 2>&1)"
         UV_EXIT=$?
+        set -e
         
         # Clean up temporary certificate bundle
         if [ -n "$CERT_BUNDLE" ] && [ -f "$CERT_BUNDLE" ]; then
@@ -311,7 +314,11 @@ main() {
                                 rm -f "$PYTHON_TAR"
                                 
                                 # Verify uv can see it
-                                if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
+                                set +e
+                                PYTHON_VERIFY_OUTPUT="$("$UV_CMD" python list 3.11 2>&1)"
+                                PYTHON_VERIFY_EXIT=$?
+                                set -e
+                                if [ $PYTHON_VERIFY_EXIT -eq 0 ] && echo "$PYTHON_VERIFY_OUTPUT" | grep -q "3.11"; then
                                     PYTHON_SPEC="3.11"
                                     _info "Python 3.11 installed successfully via workaround"
                                     break 2
