@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sbboot"
-version = "0.3.11"
+version = "0.3.12"
 description = "SealBridge Bootstrap: Two-gate workstation bootstrap utility."
 authors = [{ name = "SealBridge", email = "dev@sealbridge.dev" }]
 license = { text = "Proprietary" }
