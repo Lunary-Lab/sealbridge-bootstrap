@@ -84,4 +84,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gitleaks detect --source . --config-path .gitleaks.toml --verbose --redact --exit-code 1
+          gitleaks detect --source . -c .gitleaks.toml --verbose --redact --exit-code 1
