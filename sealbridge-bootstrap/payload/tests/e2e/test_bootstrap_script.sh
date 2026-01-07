@@ -4,7 +4,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/bootstrap.sh"
+# In GitHub Actions, we're in sealbridge-bootstrap directory, so path is different
+if [ -f "sealbridge-bootstrap/bootstrap.sh" ]; then
+    BOOTSTRAP_SCRIPT="sealbridge-bootstrap/bootstrap.sh"
+elif [ -f "$REPO_ROOT/sealbridge-bootstrap/bootstrap.sh" ]; then
+    BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/bootstrap.sh"
+else
+    BOOTSTRAP_SCRIPT="$REPO_ROOT/sealbridge-bootstrap/sealbridge-bootstrap/bootstrap.sh"
+fi
 
 if [ ! -f "$BOOTSTRAP_SCRIPT" ]; then
     echo "ERROR: bootstrap.sh not found at $BOOTSTRAP_SCRIPT"
