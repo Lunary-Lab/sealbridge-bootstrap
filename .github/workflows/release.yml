@@ -1,0 +1,143 @@
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better secret detection
+
+      - name: Scan codebase for secrets
+        # Note: Gitleaks is free but requires a free license key for GitHub organizations
+        # Get your free license at: https://gitleaks.io/products.html
+        # Then add it as a GitHub Secret named GITLEAKS_LICENSE
+        # GITHUB_TOKEN is automatically provided by GitHub Actions, no need to set it
+        if: env.GITLEAKS_LICENSE != ''
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaks.toml
+          fail: true
+          no-git: false
+          verbose: true
+
+      - id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Update Python package version
+        run: |
+          VERSION="${{ env.VERSION }}"
+          VERSION_NO_V="${VERSION#v}"
+          sed -i "s|^__version__ = \".*\"|__version__ = \"$VERSION_NO_V\"|" sealbridge-bootstrap/payload/src/sbboot/__init__.py
+          sed -i "s|^version = \".*\"|version = \"$VERSION_NO_V\"|" sealbridge-bootstrap/payload/pyproject.toml
+
+      - name: Create payload archive
+        run: |
+          mkdir -p release
+          # Ensure age_key.enc is included if it exists in the root (for manual releases)
+          # OR fail if not found? No, typically this file is NOT in the repo for security,
+          # but we need a way to distribute it or fetch it.
+          # The new design assumes age_key.enc is bundled or fetched.
+          # If we want to bundle it, it must be present during build.
+          # Ideally, we pass it as a secret to the build and write it to a file.
+          if [ -n "${{ secrets.AGE_KEY_ENC_BASE64 }}" ]; then
+             echo "${{ secrets.AGE_KEY_ENC_BASE64 }}" | base64 -d > sealbridge-bootstrap/payload/age_key.enc
+             echo "✅ age_key.enc injected from secrets"
+          else
+             echo "⚠️ AGE_KEY_ENC_BASE64 secret not set. Payload will not contain age_key.enc"
+             # This might be fine if we fetch it from a URL at runtime, but simpler is bundling.
+          fi
+          
+          tar -czf release/payload.tar.gz -C sealbridge-bootstrap/payload .
+
+      - name: Scan payload bundle for secrets (skip if no license)
+        if: env.GITLEAKS_LICENSE != ''
+        run: |
+          echo "Scanning payload bundle for secrets..."
+          # Extract and scan payload contents
+          mkdir -p payload-scan
+          tar -xzf release/payload.tar.gz -C payload-scan
+          
+          # Use gitleaks to scan extracted payload with baseline
+          if docker run --rm -v "$(pwd):/path" -w /path zricethezav/gitleaks:latest detect \
+            --source="/path/payload-scan" \
+            --no-git \
+            --verbose \
+            -c "/path/.gitleaks.toml" \
+            -b "/path/.gitleaksignore" \
+            --exit-code 1; then
+            echo "✅ No secrets found in payload bundle"
+          else
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 1 ]; then
+              echo "::error::Secrets found in payload bundle! Release aborted."
+              exit 1
+            else
+              echo "::error::Gitleaks scan failed with exit code $EXIT_CODE. Check the logs above for details."
+              exit $EXIT_CODE
+            fi
+          fi
+      - name: Skip secrets scan (no license)
+        if: env.GITLEAKS_LICENSE == ''
+        run: |
+          echo "⚠️ Skipping secrets scan - GITLEAKS_LICENSE not configured"
+          echo "Gitleaks is free but requires a free license key for GitHub organizations."
+          echo "Get your free license at: https://gitleaks.io/products.html"
+          echo "Then add it as a GitHub Secret named GITLEAKS_LICENSE"
+
+      - id: checksums
+        run: |
+          cd release
+          SHA256_TAR=$(sha256sum payload.tar.gz | cut -d' ' -f1)
+          echo "SHA256_TAR=$SHA256_TAR" >> $GITHUB_ENV
+
+          echo "SHA256 Checksums for SealBridge Bootstrap version ${{ env.VERSION }}" > checksums.txt
+          echo "--------------------------------------------------" >> checksums.txt
+          echo "$SHA256_TAR  payload.tar.gz" >> checksums.txt
+
+      - name: Update bootstrap scripts with checksum and version
+        run: |
+          VERSION="${{ env.VERSION }}"
+          VERSION_NO_V="${VERSION#v}"
+          SHA256="${{ env.SHA256_TAR }}"
+          
+          # Update bootstrap.sh
+          sed -i "s|^APP_VERSION=\".*\"|APP_VERSION=\"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.sh
+          sed -i "s|^PAYLOAD_URL=\".*\"|PAYLOAD_URL=\"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.sh
+          sed -i "s|^PAYLOAD_SHA256=\".*\"|PAYLOAD_SHA256=\"$SHA256\"|" sealbridge-bootstrap/bootstrap.sh
+
+          # Update bootstrap.ps1
+          sed -i "s|^\\\$APP_VERSION = \".*\"|\\\$APP_VERSION = \"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.ps1
+          sed -i "s|^\\\$PAYLOAD_URL = \".*\"|\\\$PAYLOAD_URL = \"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.ps1
+          sed -i "s|^\\\$PAYLOAD_SHA256 = \".*\"|\\\$PAYLOAD_SHA256 = \"$SHA256\"|" sealbridge-bootstrap/bootstrap.ps1
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/payload.tar.gz
+            release/checksums.txt
+            sealbridge-bootstrap/bootstrap.sh
+            sealbridge-bootstrap/bootstrap.ps1
+          body: |
+            SealBridge Bootstrap version ${{ env.VERSION }}
+
+            ## SHA256 Checksums
+            ```
+            ${{ env.SHA256_TAR }}  payload.tar.gz
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

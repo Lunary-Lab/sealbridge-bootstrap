@@ -1,0 +1,16 @@
+# Gitleaks baseline - exact false positives only
+# This file contains the exact fingerprints of known false positives
+# DO NOT add real secrets here - only false positives
+
+# False positive: password=True function parameter in Python (not a secret)
+# File: payload/src/sbboot/cli.py:password-in-code:89
+payload/src/sbboot/cli.py:password-in-code:89
+
+# False positive: password=True function parameter in Python (not a secret)
+# File: payload/src/sbboot/cli.py:password-in-code:212
+payload/src/sbboot/cli.py:password-in-code:212
+
+# False positive: password=True function parameter in Python (not a secret)
+# File: payload/src/sbboot/otp.py:password-in-code:38
+payload/src/sbboot/otp.py:password-in-code:38
+

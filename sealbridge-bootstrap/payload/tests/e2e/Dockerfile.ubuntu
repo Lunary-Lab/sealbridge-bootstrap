@@ -1,0 +1,51 @@
+# Dockerfile.ubuntu
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3.11 \
+    python3.11-venv \
+    curl \
+    git \
+    ssh \
+    zstd \
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash tester
+# Set up SSH for the user
+RUN mkdir -p /home/tester/.ssh && \
+    chmod 700 /home/tester/.ssh && \
+    chown -R tester:tester /home/tester/.ssh
+
+USER tester
+WORKDIR /home/tester
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/tester/.cargo/bin:${PATH}"
+
+# Copy the application payload and test assets
+COPY --chown=tester:tester ./payload /app/payload
+COPY --chown=tester:tester ./payload/tests/e2e/mock_otp_server.py /app/mock_otp_server.py
+COPY --chown=tester:tester ./payload/tests/e2e/setup_e2e_env.sh /app/setup_e2e_env.sh
+
+# Run the setup script to prepare the E2E environment
+USER root
+RUN chmod +x /app/setup_e2e_env.sh && /app/setup_e2e_env.sh
+USER tester
+
+# Set up the Python environment for the application
+WORKDIR /app/payload
+RUN uv venv && \
+    . .venv/bin/activate && \
+    uv pip sync requirements.lock && \
+    uv pip install -e .
+
+# Expose the OTP port
+EXPOSE 8765
+
+CMD ["/bin/bash"]
