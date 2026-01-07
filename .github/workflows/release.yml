@@ -31,6 +31,11 @@ jobs:
           uv pip sync requirements.lock
           uv pip install -e .
           uv pip install pytest
+      - name: Test bootstrap script structure
+        working-directory: sealbridge-bootstrap
+        run: |
+          bash sealbridge-bootstrap/payload/tests/e2e/test_bootstrap_script.sh
+      
       - name: Run E2E tests (isolated - macOS)
         working-directory: sealbridge-bootstrap/payload
         env:

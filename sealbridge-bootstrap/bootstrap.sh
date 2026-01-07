@@ -186,46 +186,31 @@ main() {
         fi
     fi
 
-    # Ensure we have Python 3.11+ available
-    # Try to use uv to install Python 3.11, but fall back to system Python if that fails
-    _info "Ensuring Python 3.11+ is available..."
-    PYTHON_VERSION=""
+    # Use system Python - don't try to install via uv (avoids SSL/certificate issues)
+    _info "Checking for Python 3.11+..."
+    PYTHON_CMD=""
     
-    # Check if uv can list/install Python (may fail due to SSL/certificate issues)
-    if uv python list 3.11 2>/dev/null | grep -q "3.11"; then
-        PYTHON_VERSION="3.11"
-        _info "Python 3.11 found via uv"
-    elif uv python install 3.11 2>/dev/null; then
-        PYTHON_VERSION="3.11"
-        _info "Python 3.11 installed via uv"
-    else
-        _info "uv Python installation failed (may be SSL/certificate issue), checking system Python..."
-        # Check if system has Python 3.11+
-        if command -v python3.11 >/dev/null 2>&1; then
-            PYTHON_VERSION="3.11"
-            _info "Using system Python 3.11"
-        elif command -v python3 >/dev/null 2>&1; then
-            # Check if python3 is 3.11+
-            PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
-            PYTHON_MAJOR=$(echo "$PYTHON_VER" | cut -d. -f1)
-            PYTHON_MINOR=$(echo "$PYTHON_VER" | cut -d. -f2)
-            if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
-                PYTHON_VERSION="python3"
-                _info "Using system Python $PYTHON_VER"
-            else
-                _err "System Python version $PYTHON_VER is too old. Need Python 3.11+. Please install Python 3.11+ or fix SSL certificates for uv."
-            fi
+    # Check for python3.11 first
+    if command -v python3.11 >/dev/null 2>&1; then
+        PYTHON_CMD="python3.11"
+        _info "Found system Python 3.11"
+    elif command -v python3 >/dev/null 2>&1; then
+        # Check if python3 is 3.11+
+        PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+        PYTHON_MAJOR=$(echo "$PYTHON_VER" | cut -d. -f1)
+        PYTHON_MINOR=$(echo "$PYTHON_VER" | cut -d. -f2)
+        if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
+            PYTHON_CMD="python3"
+            _info "Found system Python $PYTHON_VER"
         else
-            _err "No Python 3.11+ found. Please install Python 3.11+ or fix SSL certificates for uv Python installation."
+            _err "System Python version $PYTHON_VER is too old. Need Python 3.11+. Please install Python 3.11+."
         fi
+    else
+        _err "No Python 3.11+ found. Please install Python 3.11+."
     fi
 
-    _info "Creating Python virtual environment..."
-    if [ -n "$PYTHON_VERSION" ] && [ "$PYTHON_VERSION" != "python3" ]; then
-        uv venv --python "$PYTHON_VERSION"
-    else
-        uv venv --python "$PYTHON_VERSION"
-    fi
+    _info "Creating Python virtual environment with $PYTHON_CMD..."
+    uv venv --python "$PYTHON_CMD"
 
     _info "Installing dependencies..."
     uv pip sync requirements.lock
