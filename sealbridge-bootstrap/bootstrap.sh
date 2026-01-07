@@ -347,6 +347,12 @@ main() {
     VENV_EXIT=$?
     set -e
     
+    # Debug: show what happened
+    if [ $VENV_EXIT -ne 0 ]; then
+        _warn "uv venv command failed with exit code $VENV_EXIT"
+        _warn "Output: $VENV_OUTPUT"
+    fi
+    
     if [ $VENV_EXIT -ne 0 ]; then
         # Check if it's an SSL certificate error
         if echo "$VENV_OUTPUT" | grep -qi "certificate\|SSL\|TLS\|peer certificate"; then
