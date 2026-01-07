@@ -50,7 +50,13 @@ _add_bin_to_path() {
         # YAML format: dotfiles_repo: "value" or dotfiles_repo: value (not null or empty string)
         if grep -q "^[[:space:]]*dotfiles_repo:" "$CONFIG_FILE" 2>/dev/null; then
             # Extract the value after the colon
+            set +e
             DOTFILES_REPO=$(grep "^[[:space:]]*dotfiles_repo:" "$CONFIG_FILE" | sed 's/.*dotfiles_repo:[[:space:]]*//' | sed 's/^"//' | sed 's/"$//' | sed "s/^'//" | sed "s/'$//")
+            DOTFILES_EXTRACT_EXIT=$?
+            set -e
+            if [ $DOTFILES_EXTRACT_EXIT -ne 0 ]; then
+                DOTFILES_REPO=""
+            fi
             
             # Validate extracted value (prevent command injection)
             # Check for dangerous characters that could be used in command injection
@@ -72,8 +78,18 @@ _add_bin_to_path() {
     
     # Validate bin directory path to prevent path traversal
     EXPECTED_BIN_DIR="$XDG_DATA_HOME/sealbridge/bin"
-    BIN_DIR_RESOLVED=$(cd "$BIN_DIR" 2>/dev/null && pwd) || BIN_DIR_RESOLVED=""
-    EXPECTED_RESOLVED=$(cd "$EXPECTED_BIN_DIR" 2>/dev/null && pwd) || EXPECTED_RESOLVED=""
+    set +e
+    BIN_DIR_RESOLVED=$(cd "$BIN_DIR" 2>/dev/null && pwd)
+    BIN_DIR_CD_EXIT=$?
+    EXPECTED_RESOLVED=$(cd "$EXPECTED_BIN_DIR" 2>/dev/null && pwd)
+    EXPECTED_CD_EXIT=$?
+    set -e
+    if [ $BIN_DIR_CD_EXIT -ne 0 ]; then
+        BIN_DIR_RESOLVED=""
+    fi
+    if [ $EXPECTED_CD_EXIT -ne 0 ]; then
+        EXPECTED_RESOLVED=""
+    fi
     
     if [ -n "$BIN_DIR_RESOLVED" ] && [ -n "$EXPECTED_RESOLVED" ] && [ "$BIN_DIR_RESOLVED" != "$EXPECTED_RESOLVED" ]; then
         _err "Invalid bin directory path: $BIN_DIR (resolved to $BIN_DIR_RESOLVED, expected $EXPECTED_RESOLVED)"
@@ -221,7 +237,13 @@ main() {
     _info "Installing Python 3.11 via uv..."
     
     # Check if Python 3.11 is already installed via uv
-    if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
+    # Temporarily disable exit on error for this check
+    set +e
+    PYTHON_CHECK_OUTPUT="$("$UV_CMD" python list 3.11 2>&1)"
+    PYTHON_CHECK_EXIT=$?
+    set -e
+    
+    if [ $PYTHON_CHECK_EXIT -eq 0 ] && echo "$PYTHON_CHECK_OUTPUT" | grep -q "3.11"; then
         _info "Python 3.11 already installed via uv"
         PYTHON_SPEC="3.11"
     else
