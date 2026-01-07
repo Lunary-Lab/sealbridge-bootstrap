@@ -222,15 +222,34 @@ main() {
     
     # Check if Python 3.11 is already installed via uv
     PYTHON_SPEC=""
+    PYTHON_PATH=""
     if "$UV_CMD" python list 3.11 2>/dev/null | grep -q "3.11"; then
         _info "Python 3.11 already installed via uv"
-        # Try to get the actual path to the installed Python
-        PYTHON_PATH="$("$UV_CMD" python list 3.11 2>/dev/null | grep "3.11" | head -1 | awk '{print $NF}' || echo "")"
+        # Try to get the actual path to the installed Python from uv's cache
+        # uv stores Python at: ~/.local/share/uv/python/cpython-{version}+{date}-{arch}/
+        UV_PYTHON_BASE="$HOME/.local/share/uv/python"
+        if [ -d "$UV_PYTHON_BASE" ]; then
+            # Find Python 3.11 installation
+            PYTHON_PATH=$(find "$UV_PYTHON_BASE" -name "python3.11" -type f 2>/dev/null | head -1)
+            if [ -z "$PYTHON_PATH" ]; then
+                # Try to find python3 or python in a 3.11 directory
+                PYTHON_DIR=$(find "$UV_PYTHON_BASE" -type d -name "*3.11*" 2>/dev/null | head -1)
+                if [ -n "$PYTHON_DIR" ]; then
+                    for py_name in "python3.11" "python3" "python"; do
+                        if [ -x "$PYTHON_DIR/$py_name" ]; then
+                            PYTHON_PATH="$PYTHON_DIR/$py_name"
+                            break
+                        fi
+                    done
+                fi
+            fi
+        fi
+        
         if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
             PYTHON_SPEC="$PYTHON_PATH"
-            _info "Using Python at: $PYTHON_PATH"
+            _info "Found Python 3.11 at: $PYTHON_PATH"
         else
-            # Fall back to version specifier
+            # Fall back to version specifier (uv will try to verify/download)
             PYTHON_SPEC="3.11"
         fi
     else
