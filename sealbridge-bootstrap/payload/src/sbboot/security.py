@@ -8,7 +8,14 @@ import platform
 # External dependencies (validated in pyproject.toml)
 import keyring
 from argon2.low_level import Type, hash_secret_raw
-from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import XChaCha20Poly1305
+except ImportError as e:
+    raise ImportError(
+        f"Failed to import XChaCha20Poly1305 from cryptography: {e}\n"
+        "This usually means the cryptography package is not properly installed or is too old.\n"
+        "Please ensure cryptography>=41.0.0 is installed: pip install --upgrade 'cryptography>=41.0.0'"
+    ) from e
 from rich.console import Console
 from rich.prompt import Prompt
 
