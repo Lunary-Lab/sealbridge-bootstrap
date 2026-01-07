@@ -179,7 +179,21 @@ def get_age_binary(config: "BootstrapConfig") -> Path:
         policy_manager = policy.get_policy_manager(config)
         download_path = bin_dir / asset_name
         console.log(f"Downloading from {download_url}")
-        util.download_file(download_url, download_path, policy_manager)
+        try:
+            util.download_file(download_url, download_path, policy_manager)
+        except Exception as e:
+            # If download fails and we're on Intel Mac, suggest using arm64 binary with Rosetta 2
+            if arch == "darwin-amd64" and "404" in str(e).lower():
+                console.print(
+                    "[yellow]Warning:[/yellow] darwin-amd64 binary not available for this age version."
+                )
+                console.print(
+                    "[yellow]Note:[/yellow] Intel Macs can use darwin-arm64 binary with Rosetta 2."
+                )
+                console.print(
+                    "[yellow]Consider:[/yellow] Updating your config to use darwin-arm64 or a different age version."
+                )
+            raise
 
         if expected_checksum:
             console.log(f"Verifying checksum for '{asset_name}'...")
