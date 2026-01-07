@@ -21,41 +21,62 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      
-      - name: Set up build environment
-        working-directory: sealbridge-bootstrap/payload
+      - name: Set version
+        id: get_version
         run: |
-          uv venv
-          source .venv/bin/activate
-          uv pip sync requirements.lock
-          uv pip install -e .
-          uv pip install build
+          VERSION="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION_NO_V="${VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_NO_V=$VERSION_NO_V" >> $GITHUB_ENV
       
-      - name: Build bootstrap payload
-        working-directory: sealbridge-bootstrap/payload
+      - name: Create payload archive
         run: |
-          source .venv/bin/activate
-          python -m build
+          mkdir -p release
+          tar -czf release/payload.tar.gz -C sealbridge-bootstrap/payload .
+      
+      - name: Calculate checksums
+        id: checksums
+        run: |
+          cd release
+          SHA256_TAR=$(sha256sum payload.tar.gz | cut -d' ' -f1)
+          echo "SHA256_TAR=$SHA256_TAR" >> $GITHUB_ENV
+          
+          echo "SHA256 Checksums for SealBridge Bootstrap version ${{ env.VERSION }}" > checksums.txt
+          echo "--------------------------------------------------" >> checksums.txt
+          echo "$SHA256_TAR  payload.tar.gz" >> checksums.txt
+      
+      - name: Update bootstrap scripts with checksum and version
+        run: |
+          VERSION="${{ env.VERSION }}"
+          VERSION_NO_V="${{ env.VERSION_NO_V }}"
+          SHA256="${{ env.SHA256_TAR }}"
+          
+          # Update bootstrap.sh
+          sed -i "s|^APP_VERSION=\".*\"|APP_VERSION=\"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.sh
+          sed -i "s|^PAYLOAD_URL=\".*\"|PAYLOAD_URL=\"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.sh
+          sed -i "s|^PAYLOAD_SHA256=\".*\"|PAYLOAD_SHA256=\"$SHA256\"|" sealbridge-bootstrap/bootstrap.sh
+          
+          # Update bootstrap.ps1
+          sed -i "s|^\\\$APP_VERSION = \".*\"|\\\$APP_VERSION = \"$VERSION_NO_V\"|" sealbridge-bootstrap/bootstrap.ps1
+          sed -i "s|^\\\$PAYLOAD_URL = \".*\"|\\\$PAYLOAD_URL = \"https://github.com/Lunary-Lab/sealbridge-bootstrap/releases/download/$VERSION/payload.tar.gz\"|" sealbridge-bootstrap/bootstrap.ps1
+          sed -i "s|^\\\$PAYLOAD_SHA256 = \".*\"|\\\$PAYLOAD_SHA256 = \"$SHA256\"|" sealbridge-bootstrap/bootstrap.ps1
       
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            sealbridge-bootstrap/payload/dist/*.tar.gz
-            sealbridge-bootstrap/payload/dist/*.whl
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: Release ${{ github.event.inputs.tag || github.ref_name }}
-          body: "Automated release of SealBridge Bootstrap payload."
+            release/payload.tar.gz
+            release/checksums.txt
+            sealbridge-bootstrap/bootstrap.sh
+            sealbridge-bootstrap/bootstrap.ps1
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          body: |
+            SealBridge Bootstrap version ${{ env.VERSION }}
+            
+            ## SHA256 Checksums
+            ```
+            ${{ env.SHA256_TAR }}  payload.tar.gz
+            ```
           draft: false
           prerelease: false
-
