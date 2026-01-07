@@ -38,7 +38,6 @@ def docker_client():
         pytest.skip(f"Docker is not available: {e}")
 
 
-@REQUIRES_TEST_INFRA
 @requires_test_infra
 @pytest.fixture(scope="module")
 def bootstrap_image(docker_client):
